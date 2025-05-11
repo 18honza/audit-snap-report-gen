@@ -1,9 +1,50 @@
 
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { User } from '@supabase/supabase-js';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 const Navbar = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Logged out successfully');
+      navigate('/');
+    } catch (error) {
+      toast.error('Failed to sign out');
+    }
+  };
+
   return (
     <nav className="border-b border-border/40 backdrop-blur-sm bg-background/95 fixed top-0 left-0 right-0 z-30">
       <div className="container flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
@@ -26,25 +67,182 @@ const Navbar = () => {
           <span className="text-xl font-bold">AuditSnap</span>
         </Link>
         
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
-              Home
-            </Link>
-            <Link to="/features" className="text-sm font-medium hover:text-primary transition-colors">
-              Features
-            </Link>
-            <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
-              Pricing
-            </Link>
-          </div>
+        {/* Desktop navigation */}
+        <div className="hidden md:flex items-center gap-6">
+          <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+            Home
+          </Link>
+          <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
+            Pricing
+          </Link>
+          <Link to="/audit" className="text-sm font-medium hover:text-primary transition-colors">
+            Run Audit
+          </Link>
+          
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <span>Account</span>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="ml-1"
+                  >
+                    <path d="m6 9 6 6 6-6"/>
+                  </svg>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>
+                  {user.email}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/account">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/login">Log in</Link>
+            </Button>
+          )}
+          
           <Button asChild size="sm">
-            <Link to="/audit" className="font-medium">
+            <Link to={user ? "/audit" : "/login"}>
               Start Free Audit
             </Link>
           </Button>
         </div>
+
+        {/* Mobile menu button */}
+        <div className="flex md:hidden">
+          <button 
+            className="text-muted-foreground p-2"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
+            ) : (
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <line x1="4" x2="20" y1="12" y2="12"></line>
+                <line x1="4" x2="20" y1="6" y2="6"></line>
+                <line x1="4" x2="20" y1="18" y2="18"></line>
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-border">
+          <div className="flex flex-col space-y-4 p-4 bg-background">
+            <Link 
+              to="/" 
+              className="text-sm font-medium hover:text-primary transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Home
+            </Link>
+            <Link 
+              to="/pricing" 
+              className="text-sm font-medium hover:text-primary transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Pricing
+            </Link>
+            <Link 
+              to="/audit" 
+              className="text-sm font-medium hover:text-primary transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Run Audit
+            </Link>
+            {user ? (
+              <>
+                <Link 
+                  to="/dashboard" 
+                  className="text-sm font-medium hover:text-primary transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link 
+                  to="/account" 
+                  className="text-sm font-medium hover:text-primary transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Settings
+                </Link>
+                <button 
+                  className="text-sm font-medium text-destructive transition-colors py-2 text-left"
+                  onClick={() => {
+                    handleSignOut();
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link 
+                to="/login" 
+                className="text-sm font-medium hover:text-primary transition-colors py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Log in
+              </Link>
+            )}
+            <Button asChild size="sm" className="mt-2">
+              <Link 
+                to={user ? "/audit" : "/login"}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Start Free Audit
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

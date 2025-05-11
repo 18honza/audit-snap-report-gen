@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
+import DemoReport from '@/components/DemoReport';
 
 const Index = () => {
   return (
@@ -39,9 +40,6 @@ const Index = () => {
               <Button asChild size="lg" className="font-medium">
                 <Link to="/audit">Start Free Audit</Link>
               </Button>
-              <Button variant="outline" size="lg">
-                View Demo Report
-              </Button>
             </motion.div>
           </div>
           
@@ -58,11 +56,7 @@ const Index = () => {
                 <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
               </div>
               <div className="p-6 flex flex-col items-center">
-                <img 
-                  src="https://via.placeholder.com/800x400?text=AuditSnap+Demo+Screenshot" 
-                  alt="AuditSnap Demo" 
-                  className="rounded-md w-full"
-                />
+                <DemoReport />
               </div>
             </div>
           </motion.div>
