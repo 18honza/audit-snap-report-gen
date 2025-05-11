@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -64,12 +63,11 @@ const Index = () => {
           </div>
           
           <motion.div 
-            className="mt-16 sm:mt-24 rounded-xl border border-border/60 p-2 shadow-lg bg-card"
+            className="mt-16 sm:mt-24 rounded-xl border border-border/60 p-2 shadow-lg bg-card animate-float"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.3 }}
             whileHover={{ y: -5 }}
-            className="animate-float"
           >
             <div className="rounded-lg overflow-hidden bg-background">
               <div className="bg-muted flex items-center gap-1.5 px-3 py-1.5">
