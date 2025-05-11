@@ -48,7 +48,7 @@ const Navbar = () => {
   return (
     <nav className="border-b border-border/40 backdrop-blur-sm bg-background/95 fixed top-0 left-0 right-0 z-30">
       <div className="container flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2 transition-transform hover:scale-105">
           <div className="bg-gradient rounded-md p-1.5">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
@@ -75,14 +75,11 @@ const Navbar = () => {
           <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
             Pricing
           </Link>
-          <Link to="/audit" className="text-sm font-medium hover:text-primary transition-colors">
-            Run Audit
-          </Link>
           
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm" className="gap-2 animate-slide-up-fade">
                   <span>Account</span>
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
@@ -118,12 +115,12 @@ const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="ghost" size="sm" className="animate-slide-up-fade">
               <Link to="/login">Log in</Link>
             </Button>
           )}
           
-          <Button asChild size="sm">
+          <Button asChild size="sm" className="animate-scale-in">
             <Link to={user ? "/audit" : "/login"}>
               Start Free Audit
             </Link>
@@ -133,7 +130,7 @@ const Navbar = () => {
         {/* Mobile menu button */}
         <div className="flex md:hidden">
           <button 
-            className="text-muted-foreground p-2"
+            className="text-muted-foreground p-2 transition-colors hover:text-primary"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -189,13 +186,6 @@ const Navbar = () => {
               onClick={() => setMobileMenuOpen(false)}
             >
               Pricing
-            </Link>
-            <Link 
-              to="/audit" 
-              className="text-sm font-medium hover:text-primary transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Run Audit
             </Link>
             {user ? (
               <>
