@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
   url: z.string().url({ message: "Please enter a valid URL" })
@@ -30,6 +31,8 @@ type FormValues = z.infer<typeof formSchema>;
 const Audit = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [auditsRemaining, setAuditsRemaining] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -38,25 +41,115 @@ const Audit = () => {
     },
   });
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/login');
+        return;
+      }
+
+      checkUserSubscription();
+    };
+    
+    checkAuth();
+  }, [navigate]);
+
+  const checkUserSubscription = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('audits_remaining')
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No subscription found
+          navigate('/dashboard');
+          toast.error('You need an active subscription to run audits');
+          return;
+        }
+        throw error;
+      }
+      
+      setAuditsRemaining(data.audits_remaining);
+      
+      if (data.audits_remaining <= 0) {
+        toast.error('You have no audits remaining in your current plan');
+        navigate('/dashboard');
+      }
+      
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+      toast.error('Failed to verify your subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (data: FormValues) => {
+    if (auditsRemaining === null || auditsRemaining <= 0) {
+      toast.error('You have no audits remaining in your current plan');
+      return;
+    }
+    
     setSubmitting(true);
     
     try {
-      // This would normally be a real API call, but we're simulating it since we don't have a backend
-      toast.info("Starting audit process...");
+      // Create a new audit report in the database
+      const { data: reportData, error: reportError } = await supabase
+        .from('audit_reports')
+        .insert({
+          url: data.url,
+          status: 'pending'
+        })
+        .select()
+        .single();
+        
+      if (reportError) {
+        throw reportError;
+      }
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the Edge function to generate the audit
+      const { error: functionError } = await supabase.functions.invoke('generate-audit', {
+        body: {
+          url: data.url,
+          reportId: reportData.id
+        }
+      });
       
-      // Navigate to results page with the URL as a param
-      navigate(`/results?url=${encodeURIComponent(data.url)}`);
+      if (functionError) {
+        throw functionError;
+      }
+
+      toast.success('Audit started successfully!');
+      
+      // Navigate to results page with the report ID
+      navigate(`/results?report=${reportData.id}`);
+      
     } catch (error) {
       console.error('Error submitting audit:', error);
-      toast.error("Failed to start audit. Please try again.");
+      toast.error('Failed to start audit. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container px-4 mx-auto py-16 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Checking your subscription...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -67,6 +160,12 @@ const Audit = () => {
             <p className="text-muted-foreground text-lg">
               Enter your website URL below to begin a comprehensive analysis.
             </p>
+            {auditsRemaining !== null && (
+              <p className="mt-2 inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                <span className="mr-1">Audits remaining:</span>
+                <span className="font-bold">{auditsRemaining}</span>
+              </p>
+            )}
           </div>
           
           <Card>

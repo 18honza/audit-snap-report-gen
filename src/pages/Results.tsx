@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
@@ -8,62 +8,178 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-
-// Import mock data services
-import { generateMockAuditData } from '@/services/mockAuditService';
+import { supabase } from '@/integrations/supabase/client';
 import { generatePDF } from '@/services/pdfService';
 
 const Results = () => {
   const [searchParams] = useSearchParams();
-  const url = searchParams.get('url') || '';
+  const reportId = searchParams.get('report');
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [pollingInterval, setPollingInterval] = useState<number | null>(null);
   const [auditData, setAuditData] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
+  const [reportStatus, setReportStatus] = useState<string>('pending');
+  const [progressPercentage, setProgressPercentage] = useState<number>(0);
 
   useEffect(() => {
-    let isMounted = true;
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/login');
+        return;
+      }
 
-    const fetchAuditResults = async () => {
-      try {
-        // Simulate API call to get results
-        setLoading(true);
-        
-        // Simulate loading delay
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Generate mock audit data
-        const data = generateMockAuditData(url);
-        
-        if (isMounted) {
-          setAuditData(data);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error fetching audit results:', error);
-        toast.error('Failed to fetch audit results. Please try again.');
-        if (isMounted) setLoading(false);
+      if (reportId) {
+        await fetchReportData();
+      } else {
+        toast.error('No report ID provided');
+        setLoading(false);
       }
     };
-
-    if (url) {
-      fetchAuditResults();
-    } else {
-      toast.error('No URL provided. Please start a new audit.');
-      setLoading(false);
-    }
+    
+    checkAuth();
 
     return () => {
-      isMounted = false;
+      // Clear polling interval on component unmount
+      if (pollingInterval !== null) {
+        clearInterval(pollingInterval);
+      }
     };
-  }, [url]);
+  }, [reportId, navigate]);
+
+  // Simulate progress while report is being generated
+  useEffect(() => {
+    if (reportStatus === 'processing') {
+      const timer = setInterval(() => {
+        setProgressPercentage(prev => {
+          // Slowly increase progress, but never reach 100% until complete
+          const newProgress = prev + (Math.random() * 2);
+          return Math.min(newProgress, 95);
+        });
+      }, 800);
+      
+      return () => clearInterval(timer);
+    } else if (reportStatus === 'completed') {
+      setProgressPercentage(100);
+    }
+  }, [reportStatus]);
+
+  const fetchReportData = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('audit_reports')
+        .select('*')
+        .eq('id', reportId)
+        .maybeSingle();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data) {
+        toast.error('Report not found');
+        navigate('/dashboard');
+        return;
+      }
+      
+      // Set the report status
+      setReportStatus(data.status);
+      
+      // If report is complete, set the data
+      if (data.status === 'completed' && data.report_data) {
+        setAuditData(data.report_data);
+        setLoading(false);
+        
+        // Clear polling if it was set
+        if (pollingInterval !== null) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+      } 
+      // If report failed
+      else if (data.status === 'failed') {
+        toast.error('Audit report failed to generate');
+        setLoading(false);
+        
+        // Clear polling if it was set
+        if (pollingInterval !== null) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+      }
+      // If report is still processing or pending, start polling
+      else if (['pending', 'processing'].includes(data.status)) {
+        // Show appropriate status
+        setProgressPercentage(data.status === 'processing' ? 30 : 10);
+        
+        // Only set up polling if we haven't already
+        if (pollingInterval === null) {
+          // Poll every 3 seconds
+          const interval = setInterval(pollReportStatus, 3000);
+          setPollingInterval(interval);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching report:', error);
+      toast.error('Failed to fetch audit report');
+      setLoading(false);
+    }
+  };
+
+  const pollReportStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_reports')
+        .select('*')
+        .eq('id', reportId)
+        .maybeSingle();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data) {
+        toast.error('Report not found');
+        clearInterval(pollingInterval!);
+        setPollingInterval(null);
+        navigate('/dashboard');
+        return;
+      }
+      
+      // Update status
+      setReportStatus(data.status);
+      
+      // If report is complete, set the data and stop polling
+      if (data.status === 'completed' && data.report_data) {
+        setAuditData(data.report_data);
+        setProgressPercentage(100);
+        setLoading(false);
+        clearInterval(pollingInterval!);
+        setPollingInterval(null);
+        toast.success('Audit report completed!');
+      }
+      // If report failed, show error and stop polling
+      else if (data.status === 'failed') {
+        toast.error('Audit report failed to generate');
+        setLoading(false);
+        clearInterval(pollingInterval!);
+        setPollingInterval(null);
+      }
+    } catch (error) {
+      console.error('Error polling report status:', error);
+    }
+  };
 
   const handleDownloadPDF = async () => {
     try {
       setGenerating(true);
       toast.info('Generating PDF report...');
       
-      // Simulate PDF generation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Use the PDF generation service
       await generatePDF(auditData);
       
       toast.success('PDF downloaded successfully!');
@@ -75,6 +191,10 @@ const Results = () => {
     }
   };
 
+  const handleReturnToDashboard = () => {
+    navigate('/dashboard');
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -83,36 +203,42 @@ const Results = () => {
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold sm:text-4xl mb-6">Analyzing Your Website</h1>
               <p className="text-muted-foreground text-lg mb-8">
-                We're currently auditing <span className="font-medium text-foreground">{url}</span>
+                {reportStatus === 'processing' ? 'We\'re currently auditing your website' : 'Preparing your audit...'}
               </p>
               
               <div className="space-y-8 max-w-md mx-auto">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Analyzing SEO factors</span>
-                    <span>68%</span>
+                    <span>{Math.round(progressPercentage * 0.7)}%</span>
                   </div>
-                  <Progress value={68} className="h-2" />
+                  <Progress value={progressPercentage * 0.7} className="h-2" />
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Checking performance metrics</span>
-                    <span>41%</span>
+                    <span>{Math.round(progressPercentage * 0.5)}%</span>
                   </div>
-                  <Progress value={41} className="h-2" />
+                  <Progress value={progressPercentage * 0.5} className="h-2" />
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Scanning accessibility</span>
-                    <span>25%</span>
+                    <span>{Math.round(progressPercentage * 0.3)}%</span>
                   </div>
-                  <Progress value={25} className="h-2" />
+                  <Progress value={progressPercentage * 0.3} className="h-2" />
                 </div>
                 
                 <div className="text-center mt-8 animate-pulse text-muted-foreground">
                   <p>This will take 30-60 seconds...</p>
+                </div>
+
+                <div className="text-center mt-4">
+                  <Button variant="outline" onClick={handleReturnToDashboard}>
+                    Return to Dashboard
+                  </Button>
                 </div>
               </div>
             </div>
@@ -129,11 +255,16 @@ const Results = () => {
           <div className="max-w-md mx-auto text-center">
             <h1 className="text-2xl font-bold mb-4">Unable to Generate Audit</h1>
             <p className="text-muted-foreground mb-6">
-              We couldn't generate an audit for the provided URL. Please try again with a different URL.
+              We couldn't generate an audit for the provided URL. This could be due to restricted access, invalid URL, or server issues.
             </p>
-            <Button asChild>
-              <a href="/audit">Start New Audit</a>
-            </Button>
+            <div className="space-y-4">
+              <Button asChild className="w-full">
+                <a href="/audit">Start New Audit</a>
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleReturnToDashboard}>
+                Return to Dashboard
+              </Button>
+            </div>
           </div>
         </div>
       </Layout>
@@ -153,13 +284,22 @@ const Results = () => {
                 </p>
               </div>
               
-              <Button 
-                onClick={handleDownloadPDF} 
-                disabled={generating}
-                className="md:w-auto w-full"
-              >
-                {generating ? 'Generating PDF...' : 'Download PDF Report'}
-              </Button>
+              <div className="flex flex-col md:flex-row gap-2">
+                <Button 
+                  onClick={handleDownloadPDF} 
+                  disabled={generating}
+                  className="md:w-auto w-full"
+                >
+                  {generating ? 'Generating PDF...' : 'Download PDF Report'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleReturnToDashboard}
+                  className="md:w-auto w-full"
+                >
+                  Back to Dashboard
+                </Button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

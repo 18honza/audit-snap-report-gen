@@ -9,7 +9,104 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      audit_reports: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          report_data: Json | null
+          status: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          report_data?: Json | null
+          status?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          report_data?: Json | null
+          status?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plans: {
+        Row: {
+          audits_allowed: number
+          created_at: string
+          description: string | null
+          features: Json | null
+          id: string
+          name: string
+          price: number
+        }
+        Insert: {
+          audits_allowed?: number
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          name: string
+          price: number
+        }
+        Update: {
+          audits_allowed?: number
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          name?: string
+          price?: number
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          active: boolean
+          audits_remaining: number
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan_id: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          audits_remaining: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          audits_remaining?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

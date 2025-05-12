@@ -106,7 +106,7 @@ const Navbar = () => {
                   <Link to="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/account">Settings</Link>
+                  <Link to="/audit">New Audit</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
@@ -197,11 +197,11 @@ const Navbar = () => {
                   Dashboard
                 </Link>
                 <Link 
-                  to="/account" 
+                  to="/audit" 
                   className="text-sm font-medium hover:text-primary transition-colors py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Settings
+                  New Audit
                 </Link>
                 <button 
                   className="text-sm font-medium text-destructive transition-colors py-2 text-left"

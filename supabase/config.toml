@@ -1,1 +1,5 @@
+
 project_id = "yuqqexlqizgzhrjydnen"
+
+[functions.generate-audit]
+verify_jwt = true
