@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -60,17 +59,28 @@ const Audit = () => {
     try {
       setLoading(true);
       
+      // First, try to get user_id from the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || !session.user) {
+        navigate('/login');
+        return;
+      }
+      
+      // Use the direct user ID in the query instead of relying on auth.uid() in RLS
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('audits_remaining')
+        .eq('user_id', session.user.id)
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
         
       if (error) {
+        // If no subscription found for this specific user, redirect to dashboard
         if (error.code === 'PGRST116') {
-          // No subscription found
+          console.log('No active subscription found for user:', session.user.id);
           navigate('/dashboard');
           toast.error('You need an active subscription to run audits');
           return;
@@ -78,6 +88,7 @@ const Audit = () => {
         throw error;
       }
       
+      console.log('Subscription found:', data);
       setAuditsRemaining(data.audits_remaining);
       
       if (data.audits_remaining <= 0) {

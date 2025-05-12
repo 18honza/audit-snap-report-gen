@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,23 +27,24 @@ const Dashboard = () => {
         return;
       }
 
-      fetchUserData();
+      fetchUserData(session.user.id);
     };
     
     checkAuth();
   }, [navigate]);
 
-  const fetchUserData = async () => {
+  const fetchUserData = async (userId: string) => {
     try {
       setLoading(true);
       
-      // Get user subscription with plan details
+      // Get user subscription with plan details using the direct user ID
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .select(`
           *,
           plans (*)
         `)
+        .eq('user_id', userId)
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -54,11 +54,12 @@ const Dashboard = () => {
         throw subscriptionError;
       }
       
+      console.log("Found subscription data:", subscriptionData);
       setSubscription(subscriptionData as UserSubscription);
       
       if (!subscriptionData) {
         // Auto-assign free plan for new users
-        await createFreeSubscription();
+        await createFreeSubscription(userId);
       }
       
     } catch (error) {
@@ -69,7 +70,7 @@ const Dashboard = () => {
     }
   };
   
-  const createFreeSubscription = async () => {
+  const createFreeSubscription = async (userId: string) => {
     try {
       // Get the Starter plan
       const { data: planData, error: planError } = await supabase
@@ -82,17 +83,11 @@ const Dashboard = () => {
         throw planError;
       }
       
-      // Create a subscription for the user
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      
+      // Create a subscription for the user with explicit user ID
       const { error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           plan_id: planData.id,
           audits_remaining: planData.audits_allowed,
           active: true
@@ -103,7 +98,7 @@ const Dashboard = () => {
       }
       
       // Refresh user data
-      fetchUserData();
+      fetchUserData(userId);
       
     } catch (error) {
       console.error('Error creating free subscription:', error);
