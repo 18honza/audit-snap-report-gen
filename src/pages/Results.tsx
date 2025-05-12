@@ -16,7 +16,7 @@ const Results = () => {
   const reportId = searchParams.get('report');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [pollingInterval, setPollingInterval] = useState<number | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [auditData, setAuditData] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
   const [reportStatus, setReportStatus] = useState<string>('pending');

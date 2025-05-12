@@ -102,12 +102,22 @@ const Audit = () => {
     setSubmitting(true);
     
     try {
-      // Create a new audit report in the database
+      // Get the current user's ID
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || !session.user) {
+        toast.error('Please log in to create an audit');
+        navigate('/login');
+        return;
+      }
+      
+      // Create a new audit report in the database with the user_id
       const { data: reportData, error: reportError } = await supabase
         .from('audit_reports')
         .insert({
           url: data.url,
-          status: 'pending'
+          status: 'pending',
+          user_id: session.user.id
         })
         .select()
         .single();
