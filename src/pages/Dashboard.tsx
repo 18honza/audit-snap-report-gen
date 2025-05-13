@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -115,6 +116,17 @@ const Dashboard = () => {
     navigate('/audit');
   };
 
+  // Fix for the type error: Create a button click handler that doesn't require parameters
+  const handleCreateFreeSubscription = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await createFreeSubscription(session.user.id);
+    } else {
+      toast.error('You need to be logged in to create a subscription');
+      navigate('/login');
+    }
+  };
+
   return (
     <Layout>
       <div className="container px-4 mx-auto py-16">
@@ -175,7 +187,7 @@ const Dashboard = () => {
                   <div className="text-center py-6">
                     <h3 className="text-lg font-medium mb-2">No active subscription found</h3>
                     <p className="text-muted-foreground mb-4">You don't have an active subscription yet</p>
-                    <Button onClick={createFreeSubscription}>Get Started with Free Plan</Button>
+                    <Button onClick={handleCreateFreeSubscription}>Get Started with Free Plan</Button>
                   </div>
                 )}
               </CardContent>

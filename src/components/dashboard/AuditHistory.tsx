@@ -23,9 +23,20 @@ const AuditHistory = () => {
     try {
       setLoading(true);
       
+      // Get current user's ID
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Handle not logged in state
+        toast.error('You need to be logged in to view audit history');
+        navigate('/login');
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('audit_reports')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
         
       if (error) {
