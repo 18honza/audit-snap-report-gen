@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +28,11 @@ const AuditHistory = () => {
       
       if (!session) {
         // Handle not logged in state
-        toast.error('You need to be logged in to view audit history');
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "You need to be logged in to view audit history"
+        });
         navigate('/login');
         return;
       }
@@ -46,7 +50,11 @@ const AuditHistory = () => {
       setReports(data || []);
     } catch (error) {
       console.error('Error fetching audit reports:', error);
-      toast.error('Failed to load audit history');
+      toast({
+        variant: "destructive",
+        title: "Failed to load audit history",
+        description: "Please try refreshing the page"
+      });
     } finally {
       setLoading(false);
     }

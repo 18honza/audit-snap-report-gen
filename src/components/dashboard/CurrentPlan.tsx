@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Database } from '@/integrations/supabase/types';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/toast';
 
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'] & {
   plans: Database['public']['Tables']['plans']['Row']

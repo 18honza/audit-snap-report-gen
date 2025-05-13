@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
@@ -12,6 +12,7 @@ type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'
 export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export const useSubscription = () => {
         return;
       }
 
+      setUserId(session.user.id);
       fetchUserData(session.user.id);
     };
     
@@ -32,8 +34,9 @@ export const useSubscription = () => {
   const fetchUserData = async (userId: string) => {
     try {
       setLoading(true);
+      console.log("Fetching subscription for user:", userId);
       
-      // Get user subscription with plan details using the direct user ID
+      // Get user subscription with plan details
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .select(`
@@ -48,7 +51,11 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error fetching subscription:', subscriptionError);
-        // Don't throw here - we'll handle no subscription below
+        toast({
+          variant: "destructive",
+          title: "Subscription error",
+          description: "We couldn't verify your subscription. Please try again."
+        });
       }
       
       console.log("Found subscription data:", subscriptionData);
@@ -63,7 +70,11 @@ export const useSubscription = () => {
       
     } catch (error) {
       console.error('Error fetching user data:', error);
-      toast.error('Failed to load your account information');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load your subscription information."
+      });
     } finally {
       setLoading(false);
     }
@@ -80,12 +91,17 @@ export const useSubscription = () => {
         
       if (planError) {
         console.error('Error fetching starter plan:', planError);
-        throw planError;
+        toast({
+          variant: "destructive",
+          title: "Plan error",
+          description: "Couldn't load the starter plan. Please try again."
+        });
+        return;
       }
       
       console.log("Creating free subscription with plan:", planData);
       
-      // Create a subscription for the user with explicit user ID
+      // Create a subscription for the user
       const { data: newSubscription, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .insert({
@@ -99,35 +115,75 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error creating subscription:', subscriptionError);
-        throw subscriptionError;
+        toast({
+          variant: "destructive",
+          title: "Subscription error",
+          description: "Couldn't create your free subscription. Please try again."
+        });
+        return;
       }
       
       console.log("Created free subscription:", newSubscription);
       
-      // Refresh user data
-      fetchUserData(userId);
-      
+      // Get the full subscription data with plan details
+      const { data: fullSubscription, error: fullSubError } = await supabase
+        .from('user_subscriptions')
+        .select(`
+          *,
+          plans (*)
+        `)
+        .eq('id', newSubscription.id)
+        .single();
+        
+      if (fullSubError) {
+        console.error('Error fetching full subscription:', fullSubError);
+      } else {
+        setSubscription(fullSubscription as UserSubscription);
+        toast({
+          title: "Welcome!",
+          description: "Your free subscription has been activated."
+        });
+      }
     } catch (error) {
       console.error('Error creating free subscription:', error);
-      toast.error('Failed to create your free subscription');
+      toast({
+        variant: "destructive", 
+        title: "Error",
+        description: "Failed to create your free subscription. Please try again."
+      });
     }
   };
 
   const handleCreateFreeSubscription = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await createFreeSubscription(session.user.id);
+    if (!userId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await createFreeSubscription(session.user.id);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "You need to be logged in to create a subscription"
+        });
+        navigate('/login');
+      }
     } else {
-      toast.error('You need to be logged in to create a subscription');
-      navigate('/login');
+      await createFreeSubscription(userId);
+    }
+  };
+
+  const refreshSubscription = async () => {
+    if (userId) {
+      await fetchUserData(userId);
     }
   };
 
   return {
     loading,
     subscription,
+    userId,
     createFreeSubscription,
     handleCreateFreeSubscription,
-    fetchUserData
+    fetchUserData: refreshSubscription
   };
 };

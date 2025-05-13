@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/toast';
 
 const Navbar = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -38,10 +38,17 @@ const Navbar = () => {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
-      toast.success('Logged out successfully');
+      toast({
+        title: "Logged out",
+        description: "You've been successfully logged out"
+      });
       navigate('/');
     } catch (error) {
-      toast.error('Failed to sign out');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to sign out"
+      });
     }
   };
 
@@ -120,11 +127,14 @@ const Navbar = () => {
             </Button>
           )}
           
-          <Button asChild size="sm" className="animate-scale-in">
-            <Link to={user ? "/audit" : "/login"}>
-              Start Free Audit
-            </Link>
-          </Button>
+          {/* Only show Start Free Audit button if user is not logged in */}
+          {!user && (
+            <Button asChild size="sm" className="animate-scale-in">
+              <Link to="/login">
+                Start Free Audit
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -214,22 +224,25 @@ const Navbar = () => {
                 </button>
               </>
             ) : (
-              <Link 
-                to="/login" 
-                className="text-sm font-medium hover:text-primary transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Log in
-              </Link>
+              <>
+                <Link 
+                  to="/login" 
+                  className="text-sm font-medium hover:text-primary transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Log in
+                </Link>
+                {/* Only show Start Free Audit button if user is not logged in */}
+                <Button asChild size="sm" className="mt-2">
+                  <Link 
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Start Free Audit
+                  </Link>
+                </Button>
+              </>
             )}
-            <Button asChild size="sm" className="mt-2">
-              <Link 
-                to={user ? "/audit" : "/login"}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Start Free Audit
-              </Link>
-            </Button>
           </div>
         </div>
       )}

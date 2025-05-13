@@ -1,10 +1,10 @@
 
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/toast';
 import { Database } from '@/integrations/supabase/types';
 
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'] & {
-  plans: Database['public']['Tables']['plans']['Row']
+  plans: Database['public']['Tables']['user_subscriptions']['Row']['plans']
 };
 
 export const useAudit = (subscription: UserSubscription | null) => {
@@ -12,13 +12,20 @@ export const useAudit = (subscription: UserSubscription | null) => {
 
   const handleStartAudit = () => {
     if (!subscription) {
-      toast.error('No active subscription found. Please refresh or contact support.');
+      toast({
+        variant: "destructive",
+        title: "No subscription found",
+        description: "Please refresh or contact support if this persists."
+      });
       return;
     }
     
     if (subscription.audits_remaining <= 0) {
-      toast.error('You have no audits remaining in your current plan');
-      navigate('/dashboard');
+      toast({
+        variant: "destructive",
+        title: "No audits remaining",
+        description: "You have no audits remaining in your current plan."
+      });
       return;
     }
     
