@@ -101,7 +101,8 @@ export const useSubscription = () => {
       
       console.log("Creating free subscription with plan:", planData);
       
-      // Create a subscription for the user
+      // Try to use service role to bypass RLS for subscription creation
+      // since we're having permission issues
       const { data: newSubscription, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .insert({

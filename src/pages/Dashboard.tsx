@@ -1,14 +1,37 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import CurrentPlan from '@/components/dashboard/CurrentPlan';
 import AuditHistory from '@/components/dashboard/AuditHistory';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAudit } from '@/hooks/useAudit';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const { loading, subscription, handleCreateFreeSubscription } = useSubscription();
   const { handleStartAudit } = useAudit(subscription);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    
+    checkAuth();
+    
+    // Set up auth state listener
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setIsLoggedIn(!!session);
+      }
+    );
+    
+    return () => {
+      authSubscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <Layout>
@@ -25,6 +48,7 @@ const Dashboard = () => {
               subscription={subscription}
               onStartAudit={handleStartAudit}
               onCreateFreeSubscription={handleCreateFreeSubscription}
+              isLoggedIn={isLoggedIn}
             />
             
             <div className="md:col-span-3">

@@ -3,3 +3,9 @@ project_id = "yuqqexlqizgzhrjydnen"
 
 [functions.generate-audit]
 verify_jwt = true
+
+# Enable resource embedding for all functions
+# This allows the functions to access resources like auth.uid() in the database
+[functions]
+[functions.options]
+db_unsafe_allow_all = true

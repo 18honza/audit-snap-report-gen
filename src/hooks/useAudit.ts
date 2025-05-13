@@ -4,7 +4,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'] & {
-  plans: Database['public']['Tables']['plans']['Row']
+  plans?: Database['public']['Tables']['plans']['Row']
 };
 
 export const useAudit = (subscription: UserSubscription | null) => {

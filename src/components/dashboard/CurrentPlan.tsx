@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,13 +14,15 @@ interface CurrentPlanProps {
   subscription: UserSubscription | null;
   onStartAudit: () => void;
   onCreateFreeSubscription: () => void;
+  isLoggedIn?: boolean;
 }
 
 const CurrentPlan: React.FC<CurrentPlanProps> = ({ 
   loading, 
   subscription, 
   onStartAudit, 
-  onCreateFreeSubscription 
+  onCreateFreeSubscription,
+  isLoggedIn = false
 }) => {
   return (
     <Card className="md:col-span-3">
