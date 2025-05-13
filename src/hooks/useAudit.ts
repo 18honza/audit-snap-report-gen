@@ -11,8 +11,14 @@ export const useAudit = (subscription: UserSubscription | null) => {
   const navigate = useNavigate();
 
   const handleStartAudit = () => {
-    if (!subscription || subscription.audits_remaining <= 0) {
+    if (!subscription) {
+      toast.error('No active subscription found. Please refresh or contact support.');
+      return;
+    }
+    
+    if (subscription.audits_remaining <= 0) {
       toast.error('You have no audits remaining in your current plan');
+      navigate('/dashboard');
       return;
     }
     

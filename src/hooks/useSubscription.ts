@@ -47,13 +47,16 @@ export const useSubscription = () => {
         .maybeSingle();
         
       if (subscriptionError) {
-        throw subscriptionError;
+        console.error('Error fetching subscription:', subscriptionError);
+        // Don't throw here - we'll handle no subscription below
       }
       
       console.log("Found subscription data:", subscriptionData);
-      setSubscription(subscriptionData as UserSubscription);
       
-      if (!subscriptionData) {
+      if (subscriptionData) {
+        setSubscription(subscriptionData as UserSubscription);
+      } else {
+        console.log("No active subscription found, creating free plan...");
         // Auto-assign free plan for new users
         await createFreeSubscription(userId);
       }
@@ -76,22 +79,30 @@ export const useSubscription = () => {
         .single();
         
       if (planError) {
+        console.error('Error fetching starter plan:', planError);
         throw planError;
       }
       
+      console.log("Creating free subscription with plan:", planData);
+      
       // Create a subscription for the user with explicit user ID
-      const { error: subscriptionError } = await supabase
+      const { data: newSubscription, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .insert({
           user_id: userId,
           plan_id: planData.id,
           audits_remaining: planData.audits_allowed,
           active: true
-        });
+        })
+        .select()
+        .single();
         
       if (subscriptionError) {
+        console.error('Error creating subscription:', subscriptionError);
         throw subscriptionError;
       }
+      
+      console.log("Created free subscription:", newSubscription);
       
       // Refresh user data
       fetchUserData(userId);

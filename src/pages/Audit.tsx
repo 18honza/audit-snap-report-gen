@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -32,6 +33,7 @@ const Audit = () => {
   const [submitting, setSubmitting] = useState(false);
   const [auditsRemaining, setAuditsRemaining] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,46 +51,43 @@ const Audit = () => {
         return;
       }
 
-      checkUserSubscription();
+      setUserId(session.user.id);
+      checkUserSubscription(session.user.id);
     };
     
     checkAuth();
   }, [navigate]);
 
-  const checkUserSubscription = async () => {
+  const checkUserSubscription = async (userId: string) => {
     try {
       setLoading(true);
       
-      // First, try to get user_id from the current session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session || !session.user) {
-        navigate('/login');
-        return;
-      }
+      console.log("Checking subscription for user:", userId);
       
       // Use the direct user ID in the query instead of relying on auth.uid() in RLS
       const { data, error } = await supabase
         .from('user_subscriptions')
-        .select('audits_remaining')
-        .eq('user_id', session.user.id)
+        .select('*, plans(*)')
+        .eq('user_id', userId)
         .eq('active', true)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
         
       if (error) {
-        // If no subscription found for this specific user, redirect to dashboard
-        if (error.code === 'PGRST116') {
-          console.log('No active subscription found for user:', session.user.id);
-          navigate('/dashboard');
-          toast.error('You need an active subscription to run audits');
-          return;
-        }
+        console.error('Error checking subscription:', error);
         throw error;
       }
       
       console.log('Subscription found:', data);
+      
+      if (!data) {
+        console.log('No active subscription found, redirecting to dashboard');
+        toast.error('You need an active subscription to run audits');
+        navigate('/dashboard');
+        return;
+      }
+      
       setAuditsRemaining(data.audits_remaining);
       
       if (data.audits_remaining <= 0) {
@@ -99,6 +98,7 @@ const Audit = () => {
     } catch (error) {
       console.error('Error checking subscription:', error);
       toast.error('Failed to verify your subscription');
+      navigate('/dashboard');
     } finally {
       setLoading(false);
     }
@@ -113,10 +113,7 @@ const Audit = () => {
     setSubmitting(true);
     
     try {
-      // Get the current user's ID
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session || !session.user) {
+      if (!userId) {
         toast.error('Please log in to create an audit');
         navigate('/login');
         return;
@@ -128,13 +125,28 @@ const Audit = () => {
         .insert({
           url: data.url,
           status: 'pending',
-          user_id: session.user.id
+          user_id: userId
         })
         .select()
         .single();
         
       if (reportError) {
         throw reportError;
+      }
+      
+      // Update the audits_remaining count
+      const { error: updateError } = await supabase
+        .from('user_subscriptions')
+        .update({ audits_remaining: auditsRemaining - 1 })
+        .eq('user_id', userId)
+        .eq('active', true);
+        
+      if (updateError) {
+        console.error('Error updating audits remaining:', updateError);
+        // Don't throw here, continue with the audit
+      } else {
+        // Update local state
+        setAuditsRemaining(prev => prev !== null ? prev - 1 : null);
       }
       
       // Call the Edge function to generate the audit
