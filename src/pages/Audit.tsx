@@ -76,14 +76,22 @@ const Audit = () => {
         
       if (error) {
         console.error('Error checking subscription:', error);
-        throw error;
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to verify your subscription"
+        });
       }
       
       console.log('Subscription found:', data);
       
       if (!data) {
         console.log('No active subscription found, redirecting to dashboard');
-        toast.error('You need an active subscription to run audits');
+        toast({
+          variant: "destructive",
+          title: "No subscription",
+          description: "You need an active subscription to run audits"
+        });
         navigate('/dashboard');
         return;
       }
@@ -91,13 +99,21 @@ const Audit = () => {
       setAuditsRemaining(data.audits_remaining);
       
       if (data.audits_remaining <= 0) {
-        toast.error('You have no audits remaining in your current plan');
+        toast({
+          variant: "destructive",
+          title: "No audits remaining",
+          description: "You have no audits remaining in your current plan"
+        });
         navigate('/dashboard');
       }
       
     } catch (error) {
       console.error('Error checking subscription:', error);
-      toast.error('Failed to verify your subscription');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to verify your subscription"
+      });
       navigate('/dashboard');
     } finally {
       setLoading(false);
@@ -106,7 +122,11 @@ const Audit = () => {
 
   const onSubmit = async (data: FormValues) => {
     if (auditsRemaining === null || auditsRemaining <= 0) {
-      toast.error('You have no audits remaining in your current plan');
+      toast({
+        variant: "destructive",
+        title: "No audits remaining",
+        description: "You have no audits remaining in your current plan"
+      });
       return;
     }
     
@@ -114,7 +134,11 @@ const Audit = () => {
     
     try {
       if (!userId) {
-        toast.error('Please log in to create an audit');
+        toast({
+          variant: "destructive",
+          title: "Authentication required",
+          description: "Please log in to create an audit"
+        });
         navigate('/login');
         return;
       }
@@ -161,14 +185,21 @@ const Audit = () => {
         throw functionError;
       }
 
-      toast.success('Audit started successfully!');
+      toast({
+        title: "Success",
+        description: "Audit started successfully!"
+      });
       
       // Navigate to results page with the report ID
       navigate(`/results?report=${reportData.id}`);
       
     } catch (error) {
       console.error('Error submitting audit:', error);
-      toast.error('Failed to start audit. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to start audit. Please try again."
+      });
     } finally {
       setSubmitting(false);
     }
