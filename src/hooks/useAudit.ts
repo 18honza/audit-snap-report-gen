@@ -1,10 +1,10 @@
 
 import { useNavigate } from 'react-router-dom';
-import { toast } from '@/components/ui/toast';
+import { toast } from '@/components/ui/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
 type UserSubscription = Database['public']['Tables']['user_subscriptions']['Row'] & {
-  plans: Database['public']['Tables']['user_subscriptions']['Row']['plans']
+  plans: Database['public']['Tables']['plans']['Row']
 };
 
 export const useAudit = (subscription: UserSubscription | null) => {

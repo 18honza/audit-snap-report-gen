@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { toast } from '@/components/ui/toast';
+import { toast } from '@/components/ui/use-toast';
 
 const Navbar = () => {
   const [user, setUser] = useState<User | null>(null);
