@@ -12,6 +12,17 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state change event:", event);
+        setIsLoggedIn(!!session);
+        setUsername(session?.user?.email || null);
+        setIsLoading(false);
+      }
+    );
+    
+    // THEN check for existing session
     const checkAuth = async () => {
       try {
         setIsLoading(true);
@@ -29,15 +40,6 @@ const Navbar = () => {
     };
     
     checkAuth();
-    
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth state change event:", event);
-        setIsLoggedIn(!!session);
-        setUsername(session?.user?.email || null);
-      }
-    );
     
     return () => {
       subscription.unsubscribe();

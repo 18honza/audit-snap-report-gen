@@ -4,6 +4,9 @@ project_id = "yuqqexlqizgzhrjydnen"
 [functions.generate-audit]
 verify_jwt = true
 
+[functions.create-subscription]
+verify_jwt = false
+
 # Enable resource embedding for all functions
 # This allows the functions to access resources and bypass RLS policies
 [functions]

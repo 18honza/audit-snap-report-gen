@@ -15,14 +15,22 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [initialChecking, setInitialChecking] = useState(true);
   const navigate = useNavigate();
   
   // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        navigate('/audit');
+      try {
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session) {
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+      } finally {
+        setInitialChecking(false);
       }
     };
     
@@ -44,7 +52,7 @@ const Login = () => {
         if (error) throw error;
         
         toast.success('Welcome back, Admin!');
-        navigate('/audit');
+        navigate('/dashboard');
         return;
       }
       
@@ -56,7 +64,7 @@ const Login = () => {
       if (error) throw error;
       
       toast.success('Successfully logged in!');
-      navigate('/audit');
+      navigate('/dashboard');
     } catch (error: any) {
       toast.error(error.message || 'Failed to login');
     } finally {
@@ -107,6 +115,16 @@ const Login = () => {
       toast.error(error.message || 'Failed to login with GitHub');
     }
   };
+
+  if (initialChecking) {
+    return (
+      <Layout>
+        <div className="container flex items-center justify-center py-16 lg:py-24 px-4 mx-auto">
+          <div className="text-center">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

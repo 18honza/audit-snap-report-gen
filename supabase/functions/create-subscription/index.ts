@@ -39,17 +39,17 @@ serve(async (req) => {
       .select('*')
       .eq('user_id', userId)
       .eq('active', true)
-      .maybeSingle();
+      .limit(1);
     
     if (checkError) {
       console.error('Error checking existing subscription:', checkError);
       throw checkError;
     }
     
-    if (existingSubscription) {
-      console.log('User already has an active subscription:', existingSubscription);
+    if (existingSubscription && existingSubscription.length > 0) {
+      console.log('User already has an active subscription:', existingSubscription[0]);
       return new Response(
-        JSON.stringify({ success: true, data: existingSubscription }),
+        JSON.stringify({ success: true, data: existingSubscription[0] }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200
