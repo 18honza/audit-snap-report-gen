@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +23,17 @@ const CurrentPlan: React.FC<CurrentPlanProps> = ({
   onCreateFreeSubscription,
   isLoggedIn = false
 }) => {
+  const handleGetStarted = () => {
+    if (!isLoggedIn) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to create a subscription."
+      });
+      return;
+    }
+    onCreateFreeSubscription();
+  };
+
   return (
     <Card className="md:col-span-3">
       <CardHeader>
@@ -75,7 +85,9 @@ const CurrentPlan: React.FC<CurrentPlanProps> = ({
           <div className="text-center py-6">
             <h3 className="text-lg font-medium mb-2">No active subscription found</h3>
             <p className="text-muted-foreground mb-4">You don't have an active subscription yet</p>
-            <Button onClick={onCreateFreeSubscription}>Get Started with Free Plan</Button>
+            <Button onClick={handleGetStarted} disabled={!isLoggedIn}>
+              {isLoggedIn ? 'Get Started with Free Plan' : 'Login to Continue'}
+            </Button>
           </div>
         )}
       </CardContent>

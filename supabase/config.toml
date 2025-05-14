@@ -5,7 +5,12 @@ project_id = "yuqqexlqizgzhrjydnen"
 verify_jwt = true
 
 # Enable resource embedding for all functions
-# This allows the functions to access resources like auth.uid() in the database
+# This allows the functions to access resources and bypass RLS policies
 [functions]
 [functions.options]
+db_unsafe_allow_all = true
+
+# Grant database access by default to all functions
+[api]
+[api.options]
 db_unsafe_allow_all = true

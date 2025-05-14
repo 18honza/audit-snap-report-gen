@@ -6,6 +6,7 @@ import AuditHistory from '@/components/dashboard/AuditHistory';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAudit } from '@/hooks/useAudit';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 const Dashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -15,8 +16,20 @@ const Dashboard = () => {
   useEffect(() => {
     // Check if user is logged in
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsLoggedIn(!!session);
+        
+        if (!session) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to view your dashboard."
+          });
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setIsLoggedIn(false);
+      }
     };
     
     checkAuth();
@@ -33,6 +46,18 @@ const Dashboard = () => {
     };
   }, []);
 
+  const handleCreateSubscription = async () => {
+    if (!isLoggedIn) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to create a subscription."
+      });
+      return;
+    }
+    
+    await handleCreateFreeSubscription();
+  };
+
   return (
     <Layout>
       <div className="container px-4 mx-auto py-16">
@@ -47,7 +72,7 @@ const Dashboard = () => {
               loading={loading} 
               subscription={subscription}
               onStartAudit={handleStartAudit}
-              onCreateFreeSubscription={handleCreateFreeSubscription}
+              onCreateFreeSubscription={handleCreateSubscription}
               isLoggedIn={isLoggedIn}
             />
             

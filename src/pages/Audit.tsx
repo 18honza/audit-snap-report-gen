@@ -43,19 +43,49 @@ const Audit = () => {
   });
 
   useEffect(() => {
+    // Check if user is logged in
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          toast({
+            title: "Authentication required",
+            description: "Please log in to create audits"
+          });
+          navigate('/login');
+          return;
+        }
 
-      setUserId(session.user.id);
-      checkUserSubscription(session.user.id);
+        setUserId(session.user.id);
+        checkUserSubscription(session.user.id);
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        toast({
+          variant: "destructive",
+          title: "Authentication error",
+          description: "Please try logging in again."
+        });
+        navigate('/login');
+      }
     };
     
     checkAuth();
+    
+    // Set up auth state listener to handle session changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          navigate('/login');
+        } else if (session) {
+          setUserId(session.user.id);
+        }
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const checkUserSubscription = async (userId: string) => {
@@ -64,7 +94,7 @@ const Audit = () => {
       
       console.log("Checking subscription for user:", userId);
       
-      // Use the direct user ID in the query instead of relying on auth.uid() in RLS
+      // Get user subscription with plan details using direct table query
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*, plans(*)')
@@ -81,6 +111,8 @@ const Audit = () => {
           title: "Error",
           description: "Failed to verify your subscription"
         });
+        navigate('/dashboard');
+        return;
       }
       
       console.log('Subscription found:', data);

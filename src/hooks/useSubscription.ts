@@ -64,8 +64,8 @@ export const useSubscription = () => {
         setSubscription(subscriptionData as UserSubscription);
       } else {
         console.log("No active subscription found, creating free plan...");
-        // Auto-assign free plan for new users
-        await createFreeSubscription(userId);
+        // Auto-assign free plan for new users with direct SQL for bypassing RLS
+        await createFreeSubscriptionWithServiceRole(userId);
       }
       
     } catch (error) {
@@ -80,7 +80,7 @@ export const useSubscription = () => {
     }
   };
 
-  const createFreeSubscription = async (userId: string) => {
+  const createFreeSubscriptionWithServiceRole = async (userId: string) => {
     try {
       // Get the Starter plan
       const { data: planData, error: planError } = await supabase
@@ -101,21 +101,17 @@ export const useSubscription = () => {
       
       console.log("Creating free subscription with plan:", planData);
       
-      // Try to use service role to bypass RLS for subscription creation
-      // since we're having permission issues
-      const { data: newSubscription, error: subscriptionError } = await supabase
-        .from('user_subscriptions')
-        .insert({
-          user_id: userId,
-          plan_id: planData.id,
-          audits_remaining: planData.audits_allowed,
-          active: true
-        })
-        .select()
-        .single();
-        
-      if (subscriptionError) {
-        console.error('Error creating subscription:', subscriptionError);
+      // Use Edge Function to bypass RLS for subscription creation
+      const { error: functionError } = await supabase.functions.invoke('create-subscription', {
+        body: {
+          userId: userId,
+          planId: planData.id,
+          auditsRemaining: planData.audits_allowed
+        }
+      });
+      
+      if (functionError) {
+        console.error('Error calling create-subscription function:', functionError);
         toast({
           variant: "destructive",
           title: "Subscription error",
@@ -124,27 +120,14 @@ export const useSubscription = () => {
         return;
       }
       
-      console.log("Created free subscription:", newSubscription);
+      // After successful creation, fetch the new subscription
+      await fetchUserData(userId);
       
-      // Get the full subscription data with plan details
-      const { data: fullSubscription, error: fullSubError } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          plans (*)
-        `)
-        .eq('id', newSubscription.id)
-        .single();
-        
-      if (fullSubError) {
-        console.error('Error fetching full subscription:', fullSubError);
-      } else {
-        setSubscription(fullSubscription as UserSubscription);
-        toast({
-          title: "Welcome!",
-          description: "Your free subscription has been activated."
-        });
-      }
+      toast({
+        title: "Welcome!",
+        description: "Your free subscription has been activated."
+      });
+      
     } catch (error) {
       console.error('Error creating free subscription:', error);
       toast({
@@ -159,7 +142,7 @@ export const useSubscription = () => {
     if (!userId) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        await createFreeSubscription(session.user.id);
+        await createFreeSubscriptionWithServiceRole(session.user.id);
       } else {
         toast({
           variant: "destructive",
@@ -169,7 +152,7 @@ export const useSubscription = () => {
         navigate('/login');
       }
     } else {
-      await createFreeSubscription(userId);
+      await createFreeSubscriptionWithServiceRole(userId);
     }
   };
 
@@ -183,7 +166,7 @@ export const useSubscription = () => {
     loading,
     subscription,
     userId,
-    createFreeSubscription,
+    createFreeSubscription: createFreeSubscriptionWithServiceRole,
     handleCreateFreeSubscription,
     fetchUserData: refreshSubscription
   };
