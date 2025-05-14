@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -51,7 +50,11 @@ const Login = () => {
         
         if (error) throw error;
         
-        toast.success('Welcome back, Admin!');
+        toast({
+          title: "Welcome back, Admin!",
+          description: "Login successful"
+        });
+        
         navigate('/dashboard');
         return;
       }
@@ -63,10 +66,18 @@ const Login = () => {
       
       if (error) throw error;
       
-      toast.success('Successfully logged in!');
+      toast({
+        title: "Login successful",
+        description: "Welcome back!"
+      });
+      
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to login');
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message || 'Failed to login'
+      });
     } finally {
       setLoading(false);
     }
@@ -84,9 +95,16 @@ const Login = () => {
       
       if (error) throw error;
       
-      toast.success('Check your email to confirm your account');
+      toast({
+        title: "Account created",
+        description: "Check your email to confirm your account"
+      });
     } catch (error: any) {
-      toast.error(error.message || 'Failed to sign up');
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: error.message || 'Failed to sign up'
+      });
     } finally {
       setLoading(false);
     }
@@ -96,11 +114,18 @@ const Login = () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
       });
       
       if (error) throw error;
     } catch (error: any) {
-      toast.error(error.message || 'Failed to login with Google');
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message || 'Failed to login with Google'
+      });
     }
   };
   
@@ -108,11 +133,18 @@ const Login = () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
       });
       
       if (error) throw error;
     } catch (error: any) {
-      toast.error(error.message || 'Failed to login with GitHub');
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message || 'Failed to login with GitHub'
+      });
     }
   };
 
@@ -222,7 +254,7 @@ const Login = () => {
                 <CardHeader>
                   <CardTitle>Create an account</CardTitle>
                   <CardDescription>
-                    Enter your details to create an AuditSnap account
+                    Enter your details to create an account
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

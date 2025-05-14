@@ -7,16 +7,34 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useAudit } from '@/hooks/useAudit';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
   const { loading, subscription, handleCreateFreeSubscription } = useSubscription();
   const { handleStartAudit } = useAudit(subscription);
 
   useEffect(() => {
-    // Check if user is logged in
+    // Set up auth state listener FIRST
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state change event:", event);
+        setIsLoggedIn(!!session);
+        
+        if (!session && event === 'SIGNED_OUT') {
+          navigate('/login');
+        }
+        
+        setIsLoading(false);
+      }
+    );
+    
+    // THEN check for existing session
     const checkAuth = async () => {
       try {
+        setIsLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         setIsLoggedIn(!!session);
         
@@ -25,26 +43,24 @@ const Dashboard = () => {
             title: "Authentication Required",
             description: "Please log in to view your dashboard."
           });
+          navigate('/login');
+          return;
         }
       } catch (error) {
         console.error("Auth check failed:", error);
         setIsLoggedIn(false);
+        navigate('/login');
+      } finally {
+        setIsLoading(false);
       }
     };
     
     checkAuth();
     
-    // Set up auth state listener
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setIsLoggedIn(!!session);
-      }
-    );
-    
     return () => {
       authSubscription.unsubscribe();
     };
-  }, []);
+  }, [navigate]);
 
   const handleCreateSubscription = async () => {
     if (!isLoggedIn) {
@@ -52,11 +68,24 @@ const Dashboard = () => {
         title: "Authentication required",
         description: "You need to be logged in to create a subscription."
       });
+      navigate('/login');
       return;
     }
     
     await handleCreateFreeSubscription();
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container px-4 mx-auto py-16 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-lg">Loading dashboard...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

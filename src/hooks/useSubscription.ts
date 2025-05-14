@@ -16,6 +16,26 @@ export const useSubscription = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("Auth state change event:", event);
+        if (event === 'SIGNED_OUT') {
+          setSubscription(null);
+          setUserId(null);
+          setLoading(false);
+        } else if (session?.user.id) {
+          setUserId(session.user.id);
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+            await fetchUserData(session.user.id);
+          }
+        } else {
+          setLoading(false);
+        }
+      }
+    );
+    
+    // THEN check for existing session
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -34,23 +54,6 @@ export const useSubscription = () => {
       }
     };
     
-    // Set up auth state listener FIRST 
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log("Auth state change event:", event);
-        if (event === 'SIGNED_OUT') {
-          setSubscription(null);
-          setUserId(null);
-        } else if (session?.user.id) {
-          setUserId(session.user.id);
-          if (event === 'SIGNED_IN') {
-            await fetchUserData(session.user.id);
-          }
-        }
-      }
-    );
-    
-    // THEN check for existing session
     checkAuth();
     
     return () => {
@@ -131,7 +134,7 @@ export const useSubscription = () => {
       console.log("Creating free subscription with plan:", planData);
       
       // Use Edge Function to bypass RLS for subscription creation
-      const { error: functionError } = await supabase.functions.invoke('create-subscription', {
+      const { data, error: functionError } = await supabase.functions.invoke('create-subscription', {
         body: {
           userId: userId,
           planId: planData.id,
