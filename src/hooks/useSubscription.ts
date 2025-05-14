@@ -17,15 +17,21 @@ export const useSubscription = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          // Don't navigate if no session found, just set loading to false
+          setLoading(false);
+          return;
+        }
 
-      setUserId(session.user.id);
-      fetchUserData(session.user.id);
+        setUserId(session.user.id);
+        await fetchUserData(session.user.id);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        setLoading(false);
+      }
     };
     
     checkAuth();
@@ -64,7 +70,7 @@ export const useSubscription = () => {
         setSubscription(subscriptionData as UserSubscription);
       } else {
         console.log("No active subscription found, creating free plan...");
-        // Auto-assign free plan for new users with direct SQL for bypassing RLS
+        // Auto-assign free plan for new users
         await createFreeSubscriptionWithServiceRole(userId);
       }
       
@@ -82,6 +88,8 @@ export const useSubscription = () => {
 
   const createFreeSubscriptionWithServiceRole = async (userId: string) => {
     try {
+      console.log("Creating free subscription for user:", userId);
+      
       // Get the Starter plan
       const { data: planData, error: planError } = await supabase
         .from('plans')
@@ -139,26 +147,25 @@ export const useSubscription = () => {
   };
 
   const handleCreateFreeSubscription = async () => {
-    if (!userId) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await createFreeSubscriptionWithServiceRole(session.user.id);
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Authentication required",
-          description: "You need to be logged in to create a subscription"
-        });
-        navigate('/login');
-      }
-    } else {
-      await createFreeSubscriptionWithServiceRole(userId);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast({
+        variant: "destructive",
+        title: "Authentication required",
+        description: "You need to be logged in to create a subscription"
+      });
+      navigate('/login');
+      return;
     }
+    
+    await createFreeSubscriptionWithServiceRole(session.user.id);
   };
 
   const refreshSubscription = async () => {
-    if (userId) {
-      await fetchUserData(userId);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await fetchUserData(session.user.id);
     }
   };
 

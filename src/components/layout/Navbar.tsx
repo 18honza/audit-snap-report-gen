@@ -33,6 +33,7 @@ const Navbar = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state change event:", event);
         setIsLoggedIn(!!session);
         setUsername(session?.user?.email || null);
       }
@@ -89,7 +90,7 @@ const Navbar = () => {
                 </div>
                 <Button variant="ghost" onClick={handleSignOut}>Log out</Button>
                 <Button asChild>
-                  <Link to="/audit">Generate Report</Link>
+                  <Link to="/dashboard">Dashboard</Link>
                 </Button>
               </>
             ) : (

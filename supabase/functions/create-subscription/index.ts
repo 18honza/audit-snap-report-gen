@@ -31,6 +31,32 @@ serve(async (req) => {
       throw new Error('Missing required fields');
     }
     
+    console.log(`Creating subscription for user ${userId} with plan ${planId} and ${auditsRemaining} audits`);
+    
+    // First check if user already has an active subscription
+    const { data: existingSubscription, error: checkError } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('active', true)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking existing subscription:', checkError);
+      throw checkError;
+    }
+    
+    if (existingSubscription) {
+      console.log('User already has an active subscription:', existingSubscription);
+      return new Response(
+        JSON.stringify({ success: true, data: existingSubscription }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
+    }
+    
     // Create subscription with service role key (bypasses RLS)
     const { data, error } = await supabase
       .from('user_subscriptions')
@@ -47,6 +73,8 @@ serve(async (req) => {
       console.error('Error creating subscription:', error);
       throw error;
     }
+    
+    console.log('Successfully created subscription:', data);
     
     return new Response(
       JSON.stringify({ success: true, data }),

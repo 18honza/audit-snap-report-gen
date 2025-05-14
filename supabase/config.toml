@@ -10,7 +10,7 @@ verify_jwt = true
 [functions.options]
 db_unsafe_allow_all = true
 
-# Grant database access by default to all functions
+# Grant database access to all functions
 [api]
 [api.options]
 db_unsafe_allow_all = true
