@@ -13,7 +13,7 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [hasCheckedInitialSubscription, setHasCheckedInitialSubscription] = useState(false);
+  const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export const useSubscription = () => {
             setLoading(false);
             setUserId(null);
             setSubscription(null);
-            setHasCheckedInitialSubscription(false);
+            setHasAttemptedCreation(false);
           }
           return;
         }
@@ -55,7 +55,7 @@ export const useSubscription = () => {
             setSubscription(null);
             setUserId(null);
             setLoading(false);
-            setHasCheckedInitialSubscription(false);
+            setHasAttemptedCreation(false);
           }
         } else if (session?.user.id && isMounted) {
           setUserId(session.user.id);
@@ -95,10 +95,12 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error fetching subscription:', subscriptionError);
-        // Only create free subscription if we haven't checked before
-        if (!hasCheckedInitialSubscription) {
-          setHasCheckedInitialSubscription(true);
+        // Only create free subscription if we haven't attempted before
+        if (!hasAttemptedCreation) {
+          setHasAttemptedCreation(true);
           await createFreeSubscription(userId);
+        } else {
+          setLoading(false);
         }
         return;
       }
@@ -107,25 +109,27 @@ export const useSubscription = () => {
       
       if (subscriptionData) {
         setSubscription(subscriptionData as UserSubscription);
-        setHasCheckedInitialSubscription(true);
+        setLoading(false);
       } else {
         console.log("No active subscription found");
-        // Only create free subscription if we haven't checked before
-        if (!hasCheckedInitialSubscription) {
-          setHasCheckedInitialSubscription(true);
+        // Only create free subscription if we haven't attempted before
+        if (!hasAttemptedCreation) {
+          setHasAttemptedCreation(true);
           await createFreeSubscription(userId);
+        } else {
+          setLoading(false);
         }
       }
       
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Only try to create free subscription if we haven't checked before
-      if (!hasCheckedInitialSubscription) {
-        setHasCheckedInitialSubscription(true);
+      // Only try to create free subscription if we haven't attempted before
+      if (!hasAttemptedCreation) {
+        setHasAttemptedCreation(true);
         await createFreeSubscription(userId);
+      } else {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -147,6 +151,7 @@ export const useSubscription = () => {
           title: "Plan error",
           description: "Couldn't load the starter plan. Please try again."
         });
+        setLoading(false);
         return;
       }
       
@@ -163,6 +168,7 @@ export const useSubscription = () => {
       
       if (functionError) {
         console.error('Error calling create-subscription function:', functionError);
+        setLoading(false);
         return;
       }
       
@@ -179,6 +185,7 @@ export const useSubscription = () => {
       
     } catch (error) {
       console.error('Error creating free subscription:', error);
+      setLoading(false);
     }
   };
 
@@ -195,8 +202,8 @@ export const useSubscription = () => {
       return;
     }
     
-    if (!hasCheckedInitialSubscription) {
-      setHasCheckedInitialSubscription(true);
+    if (!hasAttemptedCreation) {
+      setHasAttemptedCreation(true);
       await createFreeSubscription(session.user.id);
     }
   };
