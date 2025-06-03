@@ -16,52 +16,63 @@ export const useSubscription = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let isMounted = true;
+
+    const checkAuthAndFetchData = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          if (isMounted) {
+            setLoading(false);
+            setUserId(null);
+            setSubscription(null);
+          }
+          return;
+        }
+
+        if (isMounted) {
+          setUserId(session.user.id);
+          await fetchUserSubscription(session.user.id);
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state change event:", event);
+        
         if (event === 'SIGNED_OUT') {
-          setSubscription(null);
-          setUserId(null);
-          setLoading(false);
-        } else if (session?.user.id) {
-          setUserId(session.user.id);
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-            await fetchUserData(session.user.id);
+          if (isMounted) {
+            setSubscription(null);
+            setUserId(null);
+            setLoading(false);
           }
-        } else {
+        } else if (session?.user.id && isMounted) {
+          setUserId(session.user.id);
+          await fetchUserSubscription(session.user.id);
+        } else if (isMounted) {
           setLoading(false);
         }
       }
     );
     
-    // THEN check for existing session
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          // Don't navigate if no session found, just set loading to false
-          setLoading(false);
-          return;
-        }
-
-        setUserId(session.user.id);
-        await fetchUserData(session.user.id);
-      } catch (error) {
-        console.error("Auth check error:", error);
-        setLoading(false);
-      }
-    };
-    
-    checkAuth();
+    // Initial auth check
+    checkAuthAndFetchData();
     
     return () => {
+      isMounted = false;
       authSubscription.unsubscribe();
     };
-  }, [navigate]);
+  }, []);
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserSubscription = async (userId: string) => {
     try {
       setLoading(true);
       console.log("Fetching subscription for user:", userId);
@@ -86,6 +97,8 @@ export const useSubscription = () => {
           title: "Subscription error",
           description: "We couldn't verify your subscription. Please try again."
         });
+        setLoading(false);
+        return;
       }
       
       console.log("Found subscription data:", subscriptionData);
@@ -94,8 +107,7 @@ export const useSubscription = () => {
         setSubscription(subscriptionData as UserSubscription);
       } else {
         console.log("No active subscription found, creating free plan...");
-        // Auto-assign free plan for new users
-        await createFreeSubscriptionWithServiceRole(userId);
+        await createFreeSubscription(userId);
       }
       
     } catch (error) {
@@ -110,7 +122,7 @@ export const useSubscription = () => {
     }
   };
 
-  const createFreeSubscriptionWithServiceRole = async (userId: string) => {
+  const createFreeSubscription = async (userId: string) => {
     try {
       console.log("Creating free subscription for user:", userId);
       
@@ -133,7 +145,7 @@ export const useSubscription = () => {
       
       console.log("Creating free subscription with plan:", planData);
       
-      // Use Edge Function to bypass RLS for subscription creation
+      // Use Edge Function to create subscription
       const { data, error: functionError } = await supabase.functions.invoke('create-subscription', {
         body: {
           userId: userId,
@@ -153,7 +165,9 @@ export const useSubscription = () => {
       }
       
       // After successful creation, fetch the new subscription
-      await fetchUserData(userId);
+      setTimeout(() => {
+        fetchUserSubscription(userId);
+      }, 1000);
       
       toast({
         title: "Welcome!",
@@ -183,13 +197,13 @@ export const useSubscription = () => {
       return;
     }
     
-    await createFreeSubscriptionWithServiceRole(session.user.id);
+    await createFreeSubscription(session.user.id);
   };
 
   const refreshSubscription = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      await fetchUserData(session.user.id);
+      await fetchUserSubscription(session.user.id);
     }
   };
 
@@ -197,7 +211,6 @@ export const useSubscription = () => {
     loading,
     subscription,
     userId,
-    createFreeSubscription: createFreeSubscriptionWithServiceRole,
     handleCreateFreeSubscription,
     fetchUserData: refreshSubscription
   };
