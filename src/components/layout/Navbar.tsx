@@ -9,16 +9,22 @@ const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log("Auth state change event:", event);
+        console.log("Navbar auth state change event:", event);
         setIsLoggedIn(!!session);
         setUsername(session?.user?.email || null);
         setIsLoading(false);
+        
+        // Clear logging out state when auth state changes
+        if (event === 'SIGNED_OUT') {
+          setIsLoggingOut(false);
+        }
       }
     );
     
@@ -47,26 +53,44 @@ const Navbar = () => {
   }, []);
 
   const handleSignOut = async () => {
+    if (isLoggingOut) return; // Prevent multiple logout attempts
+    
     try {
+      setIsLoggingOut(true);
+      console.log("Starting logout process...");
+      
+      // Clear local state first
+      setIsLoggedIn(false);
+      setUsername(null);
+      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
+        console.error('Logout error:', error);
         throw error;
       }
       
+      console.log("Logout successful");
       toast({
         title: "Logged out",
         description: "You have been successfully logged out"
       });
       
+      // Navigate to home page
       navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
+      // Reset state on error
+      setIsLoggedIn(true);
+      if (username) setUsername(username);
+      
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to log out. Please try again."
       });
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -90,7 +114,13 @@ const Navbar = () => {
                 <div className="hidden md:flex items-center">
                   <span className="text-sm mr-2">{username}</span>
                 </div>
-                <Button variant="ghost" onClick={handleSignOut}>Log out</Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleSignOut}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? 'Logging out...' : 'Log out'}
+                </Button>
                 <Button asChild>
                   <Link to="/dashboard">Dashboard</Link>
                 </Button>

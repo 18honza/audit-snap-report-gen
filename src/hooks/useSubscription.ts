@@ -13,6 +13,7 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasCheckedInitialSubscription, setHasCheckedInitialSubscription] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export const useSubscription = () => {
             setLoading(false);
             setUserId(null);
             setSubscription(null);
+            setHasCheckedInitialSubscription(false);
           }
           return;
         }
@@ -53,6 +55,7 @@ export const useSubscription = () => {
             setSubscription(null);
             setUserId(null);
             setLoading(false);
+            setHasCheckedInitialSubscription(false);
           }
         } else if (session?.user.id && isMounted) {
           setUserId(session.user.id);
@@ -92,8 +95,11 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error fetching subscription:', subscriptionError);
-        // Create free subscription if none exists
-        await createFreeSubscription(userId);
+        // Only create free subscription if we haven't checked before
+        if (!hasCheckedInitialSubscription) {
+          setHasCheckedInitialSubscription(true);
+          await createFreeSubscription(userId);
+        }
         return;
       }
       
@@ -101,15 +107,23 @@ export const useSubscription = () => {
       
       if (subscriptionData) {
         setSubscription(subscriptionData as UserSubscription);
+        setHasCheckedInitialSubscription(true);
       } else {
-        console.log("No active subscription found, creating free plan...");
-        await createFreeSubscription(userId);
+        console.log("No active subscription found");
+        // Only create free subscription if we haven't checked before
+        if (!hasCheckedInitialSubscription) {
+          setHasCheckedInitialSubscription(true);
+          await createFreeSubscription(userId);
+        }
       }
       
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Try to create free subscription on any error
-      await createFreeSubscription(userId);
+      // Only try to create free subscription if we haven't checked before
+      if (!hasCheckedInitialSubscription) {
+        setHasCheckedInitialSubscription(true);
+        await createFreeSubscription(userId);
+      }
     } finally {
       setLoading(false);
     }
@@ -154,15 +168,14 @@ export const useSubscription = () => {
       
       console.log("Successfully created subscription:", data);
       
-      // After successful creation, fetch the new subscription
-      setTimeout(() => {
-        fetchUserSubscription(userId);
-      }, 1000);
-      
+      // Show success toast only once
       toast({
         title: "Welcome!",
         description: "Your free subscription has been activated."
       });
+      
+      // Refresh subscription data after successful creation
+      await fetchUserSubscription(userId);
       
     } catch (error) {
       console.error('Error creating free subscription:', error);
@@ -182,7 +195,10 @@ export const useSubscription = () => {
       return;
     }
     
-    await createFreeSubscription(session.user.id);
+    if (!hasCheckedInitialSubscription) {
+      setHasCheckedInitialSubscription(true);
+      await createFreeSubscription(session.user.id);
+    }
   };
 
   const refreshSubscription = async () => {
