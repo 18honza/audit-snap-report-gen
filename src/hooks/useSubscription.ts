@@ -13,7 +13,6 @@ export const useSubscription = () => {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,7 +27,6 @@ export const useSubscription = () => {
             setLoading(false);
             setUserId(null);
             setSubscription(null);
-            setHasAttemptedCreation(false);
           }
           return;
         }
@@ -55,7 +53,6 @@ export const useSubscription = () => {
             setSubscription(null);
             setUserId(null);
             setLoading(false);
-            setHasAttemptedCreation(false);
           }
         } else if (session?.user.id && isMounted) {
           setUserId(session.user.id);
@@ -80,7 +77,7 @@ export const useSubscription = () => {
       setLoading(true);
       console.log("Fetching subscription for user:", userId);
       
-      // Get user subscription with plan details
+      // Get user subscription with plan details - simplified query
       const { data: subscriptionData, error: subscriptionError } = await supabase
         .from('user_subscriptions')
         .select(`
@@ -95,13 +92,7 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error fetching subscription:', subscriptionError);
-        // Only create free subscription if we haven't attempted before
-        if (!hasAttemptedCreation) {
-          setHasAttemptedCreation(true);
-          await createFreeSubscription(userId);
-        } else {
-          setLoading(false);
-        }
+        setLoading(false);
         return;
       }
       
@@ -109,33 +100,20 @@ export const useSubscription = () => {
       
       if (subscriptionData) {
         setSubscription(subscriptionData as UserSubscription);
-        setLoading(false);
-      } else {
-        console.log("No active subscription found");
-        // Only create free subscription if we haven't attempted before
-        if (!hasAttemptedCreation) {
-          setHasAttemptedCreation(true);
-          await createFreeSubscription(userId);
-        } else {
-          setLoading(false);
-        }
       }
+      
+      setLoading(false);
       
     } catch (error) {
       console.error('Error fetching user data:', error);
-      // Only try to create free subscription if we haven't attempted before
-      if (!hasAttemptedCreation) {
-        setHasAttemptedCreation(true);
-        await createFreeSubscription(userId);
-      } else {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
   const createFreeSubscription = async (userId: string) => {
     try {
       console.log("Creating free subscription for user:", userId);
+      setLoading(true);
       
       // Get the Starter plan
       const { data: planData, error: planError } = await supabase
@@ -202,10 +180,7 @@ export const useSubscription = () => {
       return;
     }
     
-    if (!hasAttemptedCreation) {
-      setHasAttemptedCreation(true);
-      await createFreeSubscription(session.user.id);
-    }
+    await createFreeSubscription(session.user.id);
   };
 
   const refreshSubscription = async () => {
