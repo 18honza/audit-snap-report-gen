@@ -34,22 +34,21 @@ serve(async (req) => {
     console.log(`Creating subscription for user ${userId} with plan ${planId} and ${auditsRemaining} audits`);
     
     // First check if user already has an active subscription
-    const { data: existingSubscription, error: checkError } = await supabase
+    const { data: existingSubscriptions, error: checkError } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .eq('active', true)
-      .maybeSingle();
+      .eq('active', true);
     
     if (checkError) {
       console.error('Error checking existing subscription:', checkError);
       throw checkError;
     }
     
-    if (existingSubscription) {
-      console.log('User already has an active subscription:', existingSubscription);
+    if (existingSubscriptions && existingSubscriptions.length > 0) {
+      console.log('User already has an active subscription:', existingSubscriptions[0]);
       return new Response(
-        JSON.stringify({ success: true, data: existingSubscription }),
+        JSON.stringify({ success: true, data: existingSubscriptions[0] }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200

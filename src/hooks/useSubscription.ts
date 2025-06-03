@@ -92,12 +92,8 @@ export const useSubscription = () => {
         
       if (subscriptionError) {
         console.error('Error fetching subscription:', subscriptionError);
-        toast({
-          variant: "destructive",
-          title: "Subscription error",
-          description: "We couldn't verify your subscription. Please try again."
-        });
-        setLoading(false);
+        // Create free subscription if none exists
+        await createFreeSubscription(userId);
         return;
       }
       
@@ -112,11 +108,8 @@ export const useSubscription = () => {
       
     } catch (error) {
       console.error('Error fetching user data:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load your subscription information."
-      });
+      // Try to create free subscription on any error
+      await createFreeSubscription(userId);
     } finally {
       setLoading(false);
     }
@@ -156,13 +149,10 @@ export const useSubscription = () => {
       
       if (functionError) {
         console.error('Error calling create-subscription function:', functionError);
-        toast({
-          variant: "destructive",
-          title: "Subscription error",
-          description: "Couldn't create your free subscription. Please try again."
-        });
         return;
       }
+      
+      console.log("Successfully created subscription:", data);
       
       // After successful creation, fetch the new subscription
       setTimeout(() => {
@@ -176,11 +166,6 @@ export const useSubscription = () => {
       
     } catch (error) {
       console.error('Error creating free subscription:', error);
-      toast({
-        variant: "destructive", 
-        title: "Error",
-        description: "Failed to create your free subscription. Please try again."
-      });
     }
   };
 
