@@ -1,6 +1,6 @@
 // Po3 + IFVG | ICT Strategy — Pine Script v6
 // Power of 3 (Accumulation > Manipulation > Distribution) + Implied & Inversion FVG
-// Backtestable strategy — signals also fire on live bars for real-time alerts.
+// Entries restricted to London/NY kill zones, post-sweep FVGs only, 1H trend filter.
 
 //@version=6
 strategy("Po3 + IFVG | ICT", shorttitle="Po3+IFVG", overlay=true,
@@ -18,35 +18,42 @@ strategy("Po3 + IFVG | ICT", shorttitle="Po3+IFVG", overlay=true,
 // INPUTS
 // ============================================================================
 
-atrPer  = input.int(14,   "ATR Period",            group="Risk")
-slBuf   = input.float(0.5,"SL Buffer (x ATR)",     group="Risk", minval=0.0, step=0.1)
-rrTP    = input.float(2.0, "Risk:Reward Ratio",     group="Risk", minval=1.0, step=0.5)
+atrPer       = input.int(14,   "ATR Period",                     group="Risk")
+slBuf        = input.float(0.3,"SL Buffer (x ATR)",              group="Risk", minval=0.0, step=0.1)
+rrTP         = input.float(3.0,"Risk:Reward Ratio",              group="Risk", minval=1.0, step=0.5)
+maxSLAtr     = input.float(2.5,"Max SL Distance (x ATR) — skip if wider", group="Risk", minval=0.5, step=0.5)
+minSweepAtr  = input.float(0.1,"Min Sweep Extension (x ATR)",    group="Risk", minval=0.0, step=0.05)
+minRangeAtr  = input.float(0.3,"Min Asian Range Size (x ATR)",   group="Risk", minval=0.0, step=0.1)
+useHTF       = input.bool(true, "1H Trend Filter (EMA 50)",      group="Risk")
 
-showFVG      = input.bool(true,  "Show FVG Zones",              group="Display")
-showIFVG     = input.bool(true,  "Show Implied FVG (IFVG)",     group="Display")
-showInvFVG   = input.bool(true,  "Show Inversion FVG",          group="Display")
-showAsian    = input.bool(true,  "Show Asian Range Box",        group="Display")
-showLondon   = input.bool(false, "Show London Box",             group="Display")
-showNY       = input.bool(false, "Show NY Box",                 group="Display")
-fvgMaxAge    = input.int(50,     "FVG Lookback (bars)",         group="Display", minval=10, maxval=300)
-fvgOpacity   = input.int(80,     "FVG Zone Opacity",            group="Display", minval=0, maxval=100)
-ifvgBodyMult = input.float(1.5,  "IFVG Body Filter",            group="Display", minval=1.0, step=0.1)
-invNeedsBody = input.bool(true,  "Inversion Needs Body Close",  group="Display")
+showFVG      = input.bool(true,  "Show FVG Zones",               group="Display")
+showIFVG     = input.bool(true,  "Show Implied FVG (IFVG)",      group="Display")
+showInvFVG   = input.bool(true,  "Show Inversion FVG",           group="Display")
+showAsian    = input.bool(true,  "Show Asian Range Box",         group="Display")
+showLondon   = input.bool(false, "Show London Box",              group="Display")
+showNY       = input.bool(false, "Show NY Box",                  group="Display")
+fvgMaxAge    = input.int(30,     "FVG Lookback (bars)",          group="Display", minval=5, maxval=200)
+fvgOpacity   = input.int(80,     "FVG Zone Opacity",             group="Display", minval=0, maxval=100)
+ifvgBodyMult = input.float(2.0,  "IFVG Body Filter",             group="Display", minval=1.0, step=0.1)
+invNeedsBody = input.bool(true,  "Inversion Needs Body Close",   group="Display")
 
-asianS  = input.int(0,  "Asian Start (UTC hr)",  group="Sessions", minval=0, maxval=23)
-asianE  = input.int(7,  "Asian End   (UTC hr)",  group="Sessions", minval=0, maxval=23)
-londonS = input.int(7,  "London Start (UTC hr)", group="Sessions", minval=0, maxval=23)
-londonE = input.int(10, "London End   (UTC hr)", group="Sessions", minval=0, maxval=23)
-nyS     = input.int(12, "NY Start     (UTC hr)", group="Sessions", minval=0, maxval=23)
-nyE     = input.int(20, "NY End       (UTC hr)", group="Sessions", minval=0, maxval=23)
+// Kill zone windows — where entries are allowed
+lkS = input.int(7,  "London Kill Zone Start (UTC hr)", group="Kill Zones", minval=0, maxval=23)
+lkE = input.int(10, "London Kill Zone End   (UTC hr)", group="Kill Zones", minval=0, maxval=23)
+nkS = input.int(13, "NY Kill Zone Start     (UTC hr)", group="Kill Zones", minval=0, maxval=23)
+nkE = input.int(16, "NY Kill Zone End       (UTC hr)", group="Kill Zones", minval=0, maxval=23)
 
-cBull     = input.color(#26a69a, "Bullish FVG",         group="Colors")
-cBear     = input.color(#ef5350, "Bearish FVG",         group="Colors")
-cIFVGBull = input.color(#fff176, "Implied FVG Bull",    group="Colors")
-cIFVGBear = input.color(#ffb74d, "Implied FVG Bear",    group="Colors")
-cInvBull  = input.color(#80deea, "Inversion FVG Bull",  group="Colors")
-cInvBear  = input.color(#ef9a9a, "Inversion FVG Bear",  group="Colors")
-cAsian    = input.color(#1565c0, "Asian Range",         group="Colors")
+// Asian session window — only for building the accumulation range
+asianS = input.int(0,  "Asian Session Start (UTC hr)", group="Sessions", minval=0, maxval=23)
+asianE = input.int(7,  "Asian Session End   (UTC hr)", group="Sessions", minval=0, maxval=23)
+
+cBull     = input.color(#26a69a, "Bullish FVG",        group="Colors")
+cBear     = input.color(#ef5350, "Bearish FVG",        group="Colors")
+cIFVGBull = input.color(#fff176, "Implied FVG Bull",   group="Colors")
+cIFVGBear = input.color(#ffb74d, "Implied FVG Bear",   group="Colors")
+cInvBull  = input.color(#80deea, "Inversion FVG Bull", group="Colors")
+cInvBear  = input.color(#ef9a9a, "Inversion FVG Bear", group="Colors")
+cAsian    = input.color(#1565c0, "Asian Range",        group="Colors")
 
 // ============================================================================
 // HELPERS
@@ -58,45 +65,55 @@ inSes(sH, eH) =>
     h = hour(time, "UTC")
     sH < eH ? h >= sH and h < eH : h >= sH or h < eH
 
-isAsian  = inSes(asianS, asianE)
-isLondon = inSes(londonS, londonE)
-isNY     = inSes(nyS, nyE)
-newDay   = ta.change(time("D")) != 0
+isAsian      = inSes(asianS,  asianE)
+isLondonKZ   = inSes(lkS,     lkE)
+isNYKZ       = inSes(nkS,     nkE)
+inKillZone   = isLondonKZ or isNYKZ
+
+newDay       = ta.change(time("D")) != 0
 
 bSz(n)   => math.abs(close[n] - open[n])
 bullC(n) => close[n] > open[n]
+
+// 1H EMA-50 trend filter — bullish when 1H close is above its 50 EMA
+htfBullish = request.security(syminfo.tickerid, "60", close > ta.ema(close, 50))
+trendOK_L  = not useHTF or htfBullish
+trendOK_S  = not useHTF or not htfBullish
 
 // ============================================================================
 // PO3 — ACCUMULATION RANGE AND MANIPULATION DETECTION
 // ============================================================================
 
-var float aHi   = na
-var float aLo   = na
-var box   aBx   = na
-var box   lBx   = na
-var box   nBx   = na
-var float swpLo = na
-var float swpHi = na
-var bool  mBull = false
-var bool  mBear = false
-var bool  mDone = false
-var bool  lfired = false
-var bool  sfired = false
+var float aHi     = na
+var float aLo     = na
+var box   aBx     = na
+var box   lBx     = na
+var box   nBx     = na
+var float swpLo   = na
+var float swpHi   = na
+var int   sweepBar = na   // bar index when manipulation sweep fired
+var bool  mBull   = false
+var bool  mBear   = false
+var bool  mDone   = false
+var bool  lfired  = false
+var bool  sfired  = false
 
 if newDay
-    aHi    := na
-    aLo    := na
-    swpLo  := na
-    swpHi  := na
-    mBull  := false
-    mBear  := false
-    mDone  := false
-    lfired := false
-    sfired := false
-    aBx    := na
-    lBx    := na
-    nBx    := na
+    aHi      := na
+    aLo      := na
+    swpLo    := na
+    swpHi    := na
+    sweepBar := na
+    mBull    := false
+    mBear    := false
+    mDone    := false
+    lfired   := false
+    sfired   := false
+    aBx      := na
+    lBx      := na
+    nBx      := na
 
+// Build Asian accumulation range
 if isAsian
     aHi := na(aHi) ? high : math.max(aHi, high)
     aLo := na(aLo) ? low  : math.min(aLo, low)
@@ -104,11 +121,12 @@ if isAsian
         if na(aBx)
             aBx := box.new(bar_index, aHi, bar_index, aLo, border_color=color.new(cAsian, 50), bgcolor=color.new(cAsian, 90), border_width=1)
         else
-            box.set_right(aBx,   bar_index)
-            box.set_top(aBx,     aHi)
-            box.set_bottom(aBx,  aLo)
+            box.set_right(aBx,  bar_index)
+            box.set_top(aBx,    aHi)
+            box.set_bottom(aBx, aLo)
 
-if isLondon and showLondon
+// Optional London/NY display boxes
+if isLondonKZ and showLondon
     if na(lBx)
         lBx := box.new(bar_index, high, bar_index, low, border_color=color.new(#1b5e20, 50), bgcolor=color.new(#1b5e20, 93))
     else
@@ -116,7 +134,7 @@ if isLondon and showLondon
         box.set_top(lBx,    math.max(box.get_top(lBx), high))
         box.set_bottom(lBx, math.min(box.get_bottom(lBx), low))
 
-if isNY and showNY
+if isNYKZ and showNY
     if na(nBx)
         nBx := box.new(bar_index, high, bar_index, low, border_color=color.new(#4a148c, 50), bgcolor=color.new(#4a148c, 93))
     else
@@ -124,16 +142,24 @@ if isNY and showNY
         box.set_top(nBx,    math.max(box.get_top(nBx), high))
         box.set_bottom(nBx, math.min(box.get_bottom(nBx), low))
 
-// Detect manipulation sweep during London or NY
-if (isLondon or isNY) and not mDone and not na(aHi) and not na(aLo)
-    if low < aLo
-        mBull := true
-        swpLo := low
-        mDone := true
-    else if high > aHi
-        mBear := true
-        swpHi := high
-        mDone := true
+// Asian range validity: must be wide enough to be meaningful
+asianRangeSz = not na(aHi) and not na(aLo) ? aHi - aLo : 0.0
+rangeOK      = asianRangeSz >= atrVal * minRangeAtr
+
+// Detect manipulation sweep — only inside kill zones, only once per day
+if inKillZone and not mDone and rangeOK and not na(aHi) and not na(aLo)
+    // Bullish sweep: price breaks below Asian low by at least minSweepAtr × ATR
+    if low < aLo and (aLo - low) >= atrVal * minSweepAtr
+        mBull    := true
+        swpLo    := low
+        sweepBar := bar_index
+        mDone    := true
+    // Bearish sweep: price breaks above Asian high
+    else if high > aHi and (high - aHi) >= atrVal * minSweepAtr
+        mBear    := true
+        swpHi    := high
+        sweepBar := bar_index
+        mDone    := true
 
 // ============================================================================
 // FVG — Detection and lifecycle
@@ -183,12 +209,12 @@ if array.size(BT) > 0
             array.remove(BM, i)
             continue
         if not array.get(BM, i)
-            box.set_right(bx, bar_index + 20)
+            box.set_right(bx, bar_index + 10)
             violated = invNeedsBody ? close < zB : low < zB
             if violated and showInvFVG
                 array.set(BM, i, true)
                 box.delete(bx)
-                box.new(array.get(BI, i), zT, bar_index + 20, zB, bgcolor=color.new(cInvBear, 70), border_color=color.new(cInvBear, 20), border_width=2)
+                box.new(array.get(BI, i), zT, bar_index + 10, zB, bgcolor=color.new(cInvBear, 70), border_color=color.new(cInvBear, 20), border_width=2)
             else if close < zB
                 array.set(BM, i, true)
                 box.delete(bx)
@@ -207,12 +233,12 @@ if array.size(ST) > 0
             array.remove(SM, i)
             continue
         if not array.get(SM, i)
-            box.set_right(bx, bar_index + 20)
+            box.set_right(bx, bar_index + 10)
             violated = invNeedsBody ? close > zT : high > zT
             if violated and showInvFVG
                 array.set(SM, i, true)
                 box.delete(bx)
-                box.new(array.get(SI, i), zT, bar_index + 20, zB, bgcolor=color.new(cInvBull, 70), border_color=color.new(cInvBull, 20), border_width=2)
+                box.new(array.get(SI, i), zT, bar_index + 10, zB, bgcolor=color.new(cInvBull, 70), border_color=color.new(cInvBull, 20), border_width=2)
             else if close > zT
                 array.set(SM, i, true)
                 box.delete(bx)
@@ -228,34 +254,66 @@ if bIFVG and showIFVG
     zT = (high[2] + close[2]) / 2
     zB = (low[0]  + open[0])  / 2
     if zT > zB
-        box.new(bar_index[2], zT, bar_index + 20, zB, bgcolor=color.new(cIFVGBull, 60), border_color=color.new(cIFVGBull, 10), border_width=2)
+        box.new(bar_index[2], zT, bar_index + 10, zB, bgcolor=color.new(cIFVGBull, 60), border_color=color.new(cIFVGBull, 10), border_width=2)
 
 if sIFVG and showIFVG
     zT = (high[0] + open[0])  / 2
     zB = (low[2]  + close[2]) / 2
     if zT > zB
-        box.new(bar_index[2], zT, bar_index + 20, zB, bgcolor=color.new(cIFVGBear, 60), border_color=color.new(cIFVGBear, 10), border_width=2)
+        box.new(bar_index[2], zT, bar_index + 10, zB, bgcolor=color.new(cIFVGBear, 60), border_color=color.new(cIFVGBear, 10), border_width=2)
 
 // ============================================================================
 // ENTRY SIGNALS
 // ============================================================================
 
+// Only count FVGs created AFTER the sweep bar (displacement FVGs, not pre-sweep ones)
 inBFZ = false
-if array.size(BT) > 0
+if array.size(BT) > 0 and not na(sweepBar)
     for i = array.size(BT) - 1 to 0
-        if not array.get(BM, i) and close >= array.get(BB, i) and close <= array.get(BT, i)
+        if not array.get(BM, i) and
+           array.get(BI, i) >= sweepBar and
+           close >= array.get(BB, i) and close <= array.get(BT, i)
             inBFZ := true
             break
 
 inSFZ = false
-if array.size(ST) > 0
+if array.size(ST) > 0 and not na(sweepBar)
     for i = array.size(ST) - 1 to 0
-        if not array.get(SM, i) and close >= array.get(SB, i) and close <= array.get(ST, i)
+        if not array.get(SM, i) and
+           array.get(SI, i) >= sweepBar and
+           close >= array.get(SB, i) and close <= array.get(ST, i)
             inSFZ := true
             break
 
-lSig = mBull and not lfired and not na(aLo) and close > aLo and (inBFZ or bIFVG)
-sSig = mBear and not sfired and not na(aHi) and close < aHi and (inSFZ or sIFVG)
+// IFVG must also form after the sweep
+postSweepBIFVG = bIFVG and not na(sweepBar) and bar_index > sweepBar
+postSweepSIFVG = sIFVG and not na(sweepBar) and bar_index > sweepBar
+
+// Prospective SL levels to validate distance before committing
+sl_l_raw = not na(swpLo) ? swpLo - atrVal * slBuf : low - atrVal * slBuf
+sl_s_raw = not na(swpHi) ? swpHi + atrVal * slBuf : high + atrVal * slBuf
+slDistL  = math.abs(close - sl_l_raw)
+slDistS  = math.abs(sl_s_raw - close)
+
+// All conditions for a valid long:
+//  1. Bullish sweep confirmed this session
+//  2. Not already fired today
+//  3. Asian range is meaningful
+//  4. Inside a kill zone
+//  5. Price has returned above Asian low (distribution started)
+//  6. 1H trend is bullish (or filter is off)
+//  7. Price is inside a post-sweep FVG or forming a post-sweep IFVG
+//  8. SL is within acceptable distance
+
+lSig = mBull and not lfired and rangeOK and inKillZone and
+       not na(aLo) and close > aLo and trendOK_L and
+       (inBFZ or postSweepBIFVG) and
+       slDistL <= atrVal * maxSLAtr
+
+sSig = mBear and not sfired and rangeOK and inKillZone and
+       not na(aHi) and close < aHi and trendOK_S and
+       (inSFZ or postSweepSIFVG) and
+       slDistS <= atrVal * maxSLAtr
 
 if lSig
     lfired := true
@@ -267,26 +325,22 @@ if sSig
 // ============================================================================
 
 if lSig
-    sl_l  = (not na(swpLo) ? swpLo : low) - atrVal * slBuf
-    tp_l  = close + math.abs(close - sl_l) * rrTP
+    tp_l = close + slDistL * rrTP
     strategy.entry("Long", strategy.long, comment="Po3+IFVG")
-    strategy.exit("Long Exit", "Long", stop=sl_l, limit=tp_l, comment="TP/SL")
+    strategy.exit("Long Exit", "Long", stop=sl_l_raw, limit=tp_l, comment="TP/SL")
 
 if sSig
-    sl_s  = (not na(swpHi) ? swpHi : high) + atrVal * slBuf
-    tp_s  = close - math.abs(sl_s - close) * rrTP
+    tp_s = close - slDistS * rrTP
     strategy.entry("Short", strategy.short, comment="Po3+IFVG")
-    strategy.exit("Short Exit", "Short", stop=sl_s, limit=tp_s, comment="TP/SL")
+    strategy.exit("Short Exit", "Short", stop=sl_s_raw, limit=tp_s, comment="TP/SL")
 
 // ============================================================================
-// VISUALS — plotshape for signals and sweeps (always scroll with chart)
+// VISUALS
 // ============================================================================
 
-// Entry signals — large arrows
 plotshape(lSig, title="Long Signal",  style=shape.triangleup,   location=location.belowbar, color=#26a69a, size=size.small, text="LONG")
 plotshape(sSig, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=#ef5350, size=size.small, text="SHORT")
 
-// Manipulation sweep markers — small dots
 plotshape(mBull and not mBull[1], title="Sweep Low",  style=shape.circle, location=location.belowbar, color=color.new(#26a69a, 40), size=size.tiny)
 plotshape(mBear and not mBear[1], title="Sweep High", style=shape.circle, location=location.abovebar, color=color.new(#ef5350, 40), size=size.tiny)
 
@@ -294,7 +348,7 @@ plotshape(mBear and not mBear[1], title="Sweep High", style=shape.circle, locati
 // ALERTS
 // ============================================================================
 
-alertcondition(lSig,                  title="Long Signal",          message="[Po3+IFVG] LONG — sweep low confirmed, price at FVG/IFVG zone.")
-alertcondition(sSig,                  title="Short Signal",         message="[Po3+IFVG] SHORT — sweep high confirmed, price at FVG/IFVG zone.")
-alertcondition(mBull and not mBull[1],title="Bullish Sweep",        message="[Po3] SWEEP LOW — bullish manipulation. Watch for FVG/IFVG entry.")
-alertcondition(mBear and not mBear[1],title="Bearish Sweep",        message="[Po3] SWEEP HIGH — bearish manipulation. Watch for FVG/IFVG entry.")
+alertcondition(lSig,                   title="Long Signal",   message="[Po3+IFVG] LONG — sweep low confirmed, price at post-sweep FVG/IFVG in kill zone.")
+alertcondition(sSig,                   title="Short Signal",  message="[Po3+IFVG] SHORT — sweep high confirmed, price at post-sweep FVG/IFVG in kill zone.")
+alertcondition(mBull and not mBull[1], title="Bullish Sweep", message="[Po3] SWEEP LOW — bullish manipulation in kill zone. Watch for displacement FVG/IFVG.")
+alertcondition(mBear and not mBear[1], title="Bearish Sweep", message="[Po3] SWEEP HIGH — bearish manipulation in kill zone. Watch for displacement FVG/IFVG.")
