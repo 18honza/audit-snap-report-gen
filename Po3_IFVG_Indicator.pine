@@ -1,69 +1,65 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0
-// © ICT Po3+IFVG Indicator — Pine Script v5
-// Strategy: Power of 3 (Accumulation → Manipulation → Distribution) + Implied & Inversion FVG
-// Optimised for Trading212 CFD — XAUUSD, EURUSD, GBPUSD, NAS100, US30, BTCUSD
+// Po3 + IFVG | ICT Strategy Indicator — Pine Script v6
+// Power of 3 (Accumulation > Manipulation > Distribution) + Implied & Inversion FVG
+// Optimised for Trading212 CFD: XAUUSD, EURUSD, GBPUSD, NAS100, US30, BTCUSD
 
-//@version=5
-indicator("Po3 + IFVG | ICT Strategy", shorttitle="Po3+IFVG",
-          overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=200)
+//@version=6
+indicator("Po3 + IFVG | ICT Strategy", shorttitle="Po3+IFVG", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=200)
 
-// ════════════════════════════════════════════════════════════════════════════
-// ① INPUTS
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// INPUTS
+// ============================================================================
 
-var G_FVG  = "━━━ Fair Value Gap ━━━"
-showFVG      = input.bool(true,  "Show Standard FVGs",             group=G_FVG)
-fvgOpacity   = input.int(85,     "FVG Fill Opacity (0=solid)",     group=G_FVG, minval=0, maxval=100)
-showFVGMit   = input.bool(false, "Show Mitigated FVGs",            group=G_FVG)
-fvgExtBars   = input.int(50,     "Extend Boxes →  (bars)",         group=G_FVG, minval=1, maxval=500)
-fvgMaxAge    = input.int(200,    "Max FVG Age (bars)",             group=G_FVG, minval=10, maxval=1000)
+// -- Fair Value Gap --
+showFVG      = input.bool(true,  "Show Standard FVGs",            group="Fair Value Gap")
+fvgOpacity   = input.int(85,     "FVG Fill Opacity (0=solid)",    group="Fair Value Gap", minval=0, maxval=100)
+showFVGMit   = input.bool(false, "Show Mitigated FVGs",           group="Fair Value Gap")
+fvgExtBars   = input.int(50,     "Extend Boxes (bars)",           group="Fair Value Gap", minval=1, maxval=500)
+fvgMaxAge    = input.int(200,    "Max FVG Age (bars)",            group="Fair Value Gap", minval=10, maxval=1000)
 
-var G_IFVG = "━━━ Implied & Inversion FVG ━━━"
-showIFVG     = input.bool(true,  "Show Implied FVGs (IFVG)",       group=G_IFVG)
-showInvFVG   = input.bool(true,  "Show Inversion FVGs",            group=G_IFVG)
-ifvgBodyMult = input.float(1.5,  "IFVG Body Filter ×",             group=G_IFVG, minval=1.0, step=0.1,
-                            tooltip="Middle candle body must be this × larger than outer candle bodies to qualify as an Implied FVG")
-invNeedsBody = input.bool(true,  "Inversion: Require Body Close",  group=G_IFVG,
-                            tooltip="ON = body close through zone triggers inversion. OFF = any wick entry triggers inversion.")
+// -- Implied and Inversion FVG --
+showIFVG     = input.bool(true,  "Show Implied FVGs (IFVG)",      group="Implied and Inversion FVG")
+showInvFVG   = input.bool(true,  "Show Inversion FVGs",           group="Implied and Inversion FVG")
+ifvgBodyMult = input.float(1.5,  "IFVG Body Filter (multiplier)", group="Implied and Inversion FVG", minval=1.0, step=0.1)
+invNeedsBody = input.bool(true,  "Inversion: Require Body Close", group="Implied and Inversion FVG")
 
-var G_PO3  = "━━━ Power of 3 (Sessions) ━━━"
-showPo3      = input.bool(true,  "Show Po3 Labels",                group=G_PO3)
-showSesBoxes = input.bool(true,  "Show Session Boxes",             group=G_PO3)
-asianS       = input.int(0,      "Asian Session Start  (UTC hr)",  group=G_PO3, minval=0, maxval=23)
-asianE       = input.int(7,      "Asian Session End    (UTC hr)",  group=G_PO3, minval=0, maxval=23)
-londonS      = input.int(7,      "London Session Start (UTC hr)",  group=G_PO3, minval=0, maxval=23)
-londonE      = input.int(10,     "London Session End   (UTC hr)",  group=G_PO3, minval=0, maxval=23)
-nyS          = input.int(12,     "NY Session Start     (UTC hr)",  group=G_PO3, minval=0, maxval=23)
-nyE          = input.int(20,     "NY Session End       (UTC hr)",  group=G_PO3, minval=0, maxval=23)
+// -- Power of 3 Sessions --
+showPo3      = input.bool(true,  "Show Po3 Labels",               group="Power of 3 Sessions")
+showSesBoxes = input.bool(true,  "Show Session Boxes",            group="Power of 3 Sessions")
+asianS       = input.int(0,      "Asian Start Hour  (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
+asianE       = input.int(7,      "Asian End Hour    (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
+londonS      = input.int(7,      "London Start Hour (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
+londonE      = input.int(10,     "London End Hour   (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
+nyS          = input.int(12,     "NY Start Hour     (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
+nyE          = input.int(20,     "NY End Hour       (UTC)",       group="Power of 3 Sessions", minval=0, maxval=23)
 
-var G_SLTP = "━━━ Stop Loss / Take Profit ━━━"
-showSLTP     = input.bool(true,  "Show SL/TP on Entry Signals",    group=G_SLTP)
-atrPer       = input.int(14,     "ATR Period",                     group=G_SLTP, minval=1)
-slBuf        = input.float(0.5,  "SL Buffer (× ATR beyond sweep)", group=G_SLTP, minval=0.0, step=0.1)
-rrTP2        = input.float(2.0,  "TP2 Risk:Reward Ratio",          group=G_SLTP, minval=1.0, step=0.5)
-showTP1      = input.bool(true,  "Show TP1  (1× risk — breakeven target)", group=G_SLTP)
-showTP2      = input.bool(true,  "Show TP2  (RR× risk — primary target)",  group=G_SLTP)
-showTP3      = input.bool(true,  "Show TP3  (1.5×RR — runner)",            group=G_SLTP)
-slLnLen      = input.int(40,     "Line Length → (bars)",           group=G_SLTP, minval=5)
+// -- Stop Loss and Take Profit --
+showSLTP     = input.bool(true,  "Show SL/TP on Entry Signals",   group="Stop Loss and Take Profit")
+atrPer       = input.int(14,     "ATR Period",                    group="Stop Loss and Take Profit", minval=1)
+slBuf        = input.float(0.5,  "SL Buffer (x ATR)",             group="Stop Loss and Take Profit", minval=0.0, step=0.1)
+rrTP2        = input.float(2.0,  "TP2 Risk:Reward Ratio",         group="Stop Loss and Take Profit", minval=1.0, step=0.5)
+showTP1      = input.bool(true,  "Show TP1 (1x risk)",            group="Stop Loss and Take Profit")
+showTP2      = input.bool(true,  "Show TP2 (RR x risk)",          group="Stop Loss and Take Profit")
+showTP3      = input.bool(true,  "Show TP3 Runner (1.5x RR)",     group="Stop Loss and Take Profit")
+slLnLen      = input.int(40,     "Line Length (bars)",            group="Stop Loss and Take Profit", minval=5)
 
-var G_COL  = "━━━ Colors ━━━"
-cBull        = input.color(#26a69a, "Bullish FVG",                 group=G_COL)
-cBear        = input.color(#ef5350, "Bearish FVG",                 group=G_COL)
-cIFVGBull    = input.color(#fff176, "Implied FVG  — Bullish",      group=G_COL)
-cIFVGBear    = input.color(#ffb74d, "Implied FVG  — Bearish",      group=G_COL)
-cInvBull     = input.color(#80deea, "Inversion FVG — Bullish",     group=G_COL)
-cInvBear     = input.color(#ef9a9a, "Inversion FVG — Bearish",     group=G_COL)
-cAsian       = input.color(#1a237e, "Asian Session Box",           group=G_COL)
-cLondon      = input.color(#1b5e20, "London Session Box",          group=G_COL)
-cNY          = input.color(#4a148c, "NY Session Box",              group=G_COL)
+// -- Colors --
+cBull        = input.color(#26a69a, "Bullish FVG",                group="Colors")
+cBear        = input.color(#ef5350, "Bearish FVG",                group="Colors")
+cIFVGBull    = input.color(#fff176, "Implied FVG Bullish",        group="Colors")
+cIFVGBear    = input.color(#ffb74d, "Implied FVG Bearish",        group="Colors")
+cInvBull     = input.color(#80deea, "Inversion FVG Bullish",      group="Colors")
+cInvBear     = input.color(#ef9a9a, "Inversion FVG Bearish",      group="Colors")
+cAsian       = input.color(#1a237e, "Asian Session Box",          group="Colors")
+cLondon      = input.color(#1b5e20, "London Session Box",         group="Colors")
+cNY          = input.color(#4a148c, "NY Session Box",             group="Colors")
 
-// ════════════════════════════════════════════════════════════════════════════
-// ② HELPERS
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// HELPERS
+// ============================================================================
 
 atrVal = ta.atr(atrPer)
 
-// True when current bar's UTC hour falls in [sH, eH)
 inSes(sH, eH) =>
     h = hour(time, "UTC")
     sH < eH ? h >= sH and h < eH : h >= sH or h < eH
@@ -74,28 +70,27 @@ isNY     = inSes(nyS, nyE)
 
 newDay   = ta.change(time("D")) != 0
 
-bSz(n)   => math.abs(close[n] - open[n])   // candle body size at offset n
-bullC(n) => close[n] > open[n]              // is candle at offset n bullish?
+bSz(n)   => math.abs(close[n] - open[n])
+bullC(n) => close[n] > open[n]
 
-// ════════════════════════════════════════════════════════════════════════════
-// ③ PO3 — SESSION BOX TRACKING & MANIPULATION DETECTION
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// PO3 — SESSION BOXES AND MANIPULATION DETECTION
+// ============================================================================
 
-var float aHi    = na    // Asian session high (accumulation range top)
-var float aLo    = na    // Asian session low  (accumulation range bottom)
-var box   aBx    = na    // Asian box object
-var box   lBx    = na    // London box object
-var box   nBx    = na    // NY box object
+var float aHi    = na
+var float aLo    = na
+var box   aBx    = na
+var box   lBx    = na
+var box   nBx    = na
 
-var float swpLo  = na    // wick low of bullish manipulation sweep
-var float swpHi  = na    // wick high of bearish manipulation sweep
-var bool  mBull  = false // true after a bullish sweep (swept below Asian low)
-var bool  mBear  = false // true after a bearish sweep (swept above Asian high)
-var bool  mDone  = false // only one sweep per session
-var bool  lfired = false // long signal already fired today
-var bool  sfired = false // short signal already fired today
+var float swpLo  = na
+var float swpHi  = na
+var bool  mBull  = false
+var bool  mBear  = false
+var bool  mDone  = false
+var bool  lfired = false
+var bool  sfired = false
 
-// ── Daily reset ──────────────────────────────────────────────────────────────
 if newDay
     aHi    := na
     aLo    := na
@@ -110,112 +105,90 @@ if newDay
     lBx    := na
     nBx    := na
 
-// ── Asian session: build accumulation range ───────────────────────────────────
+// Accumulate Asian range
 if isAsian
     aHi := na(aHi) ? high : math.max(aHi, high)
     aLo := na(aLo) ? low  : math.min(aLo, low)
     if showSesBoxes and showPo3
         if na(aBx)
-            aBx := box.new(bar_index, aHi, bar_index, aLo,
-                           border_color=color.new(cAsian, 40),
-                           bgcolor=color.new(cAsian, 88))
+            aBx := box.new(bar_index, aHi, bar_index, aLo, border_color=color.new(cAsian, 40), bgcolor=color.new(cAsian, 88))
         else
-            box.set_right(aBx,  bar_index)
-            box.set_top(aBx,    aHi)
+            box.set_right(aBx, bar_index)
+            box.set_top(aBx, aHi)
             box.set_bottom(aBx, aLo)
 
-// ── London session box ────────────────────────────────────────────────────────
+// London session box
 if isLondon and showSesBoxes and showPo3
     if na(lBx)
-        lBx := box.new(bar_index, high, bar_index, low,
-                       border_color=color.new(cLondon, 40),
-                       bgcolor=color.new(cLondon, 92))
+        lBx := box.new(bar_index, high, bar_index, low, border_color=color.new(cLondon, 40), bgcolor=color.new(cLondon, 92))
     else
-        box.set_right(lBx,  bar_index)
-        box.set_top(lBx,    math.max(box.get_top(lBx),    high))
+        box.set_right(lBx, bar_index)
+        box.set_top(lBx, math.max(box.get_top(lBx), high))
         box.set_bottom(lBx, math.min(box.get_bottom(lBx), low))
 
-// ── NY session box ────────────────────────────────────────────────────────────
+// NY session box
 if isNY and showSesBoxes and showPo3
     if na(nBx)
-        nBx := box.new(bar_index, high, bar_index, low,
-                       border_color=color.new(cNY, 40),
-                       bgcolor=color.new(cNY, 92))
+        nBx := box.new(bar_index, high, bar_index, low, border_color=color.new(cNY, 40), bgcolor=color.new(cNY, 92))
     else
-        box.set_right(nBx,  bar_index)
-        box.set_top(nBx,    math.max(box.get_top(nBx),    high))
+        box.set_right(nBx, bar_index)
+        box.set_top(nBx, math.max(box.get_top(nBx), high))
         box.set_bottom(nBx, math.min(box.get_bottom(nBx), low))
 
-// ── Detect manipulation sweep (London/NY breaks Asian range) ──────────────────
+// Detect Po3 manipulation sweep
 if (isLondon or isNY) and not mDone and not na(aHi) and not na(aLo)
     if low < aLo
         mBull  := true
         swpLo  := low
         mDone  := true
         if showPo3
-            label.new(bar_index, low,
-                      "SWEEP LOW\n(Manipulation)",
-                      color=color.new(cBull, 10),
-                      style=label.style_label_up,
-                      textcolor=color.white, size=size.small)
+            label.new(bar_index, low, "SWEEP LOW\n(Manipulation)", color=color.new(cBull, 10), style=label.style_label_up, textcolor=color.white, size=size.small)
     else if high > aHi
         mBear  := true
         swpHi  := high
         mDone  := true
         if showPo3
-            label.new(bar_index, high,
-                      "SWEEP HIGH\n(Manipulation)",
-                      color=color.new(cBear, 10),
-                      style=label.style_label_down,
-                      textcolor=color.white, size=size.small)
+            label.new(bar_index, high, "SWEEP HIGH\n(Manipulation)", color=color.new(cBear, 10), style=label.style_label_down, textcolor=color.white, size=size.small)
 
-// ════════════════════════════════════════════════════════════════════════════
-// ④ STANDARD FVG — Detection, Boxes, Lifecycle (mitigation + inversion)
-// ════════════════════════════════════════════════════════════════════════════
-// Parallel arrays: Bull FVG zones
-var float[] BT = array.new_float()  // zone top
-var float[] BB = array.new_float()  // zone bottom
-var int[]   BI = array.new_int()    // bar index where zone was created
-var box[]   BX = array.new_box()    // box drawing object
-var bool[]  BM = array.new_bool()   // mitigated flag
+// ============================================================================
+// STANDARD FVG — Detection, Boxes, Mitigation, Inversion
+// ============================================================================
 
-// Parallel arrays: Bear FVG zones
+var float[] BT = array.new_float()
+var float[] BB = array.new_float()
+var int[]   BI = array.new_int()
+var box[]   BX = array.new_box()
+var bool[]  BM = array.new_bool()
+
 var float[] ST = array.new_float()
 var float[] SB = array.new_float()
 var int[]   SI = array.new_int()
 var box[]   SX = array.new_box()
 var bool[]  SM = array.new_bool()
 
-// Bullish FVG: gap between C1 high and C3 low  (high[2] < low[0])
-bullFVG = high[2] < low[0]
-// Bearish FVG: gap between C1 low and C3 high  (low[2]  > high[0])
-bearFVG = low[2]  > high[0]
-
-if bullFVG and showFVG
+// Bullish FVG: gap between C1 high and C3 low
+if high[2] < low[0] and showFVG
     t  = low[0]
     b  = high[2]
-    bx = box.new(bar_index[2], t, bar_index + fvgExtBars, b,
-                 bgcolor=color.new(cBull, fvgOpacity),
-                 border_color=color.new(cBull, 40))
+    bx = box.new(bar_index[2], t, bar_index + fvgExtBars, b, bgcolor=color.new(cBull, fvgOpacity), border_color=color.new(cBull, 40))
     array.push(BT, t)
     array.push(BB, b)
     array.push(BI, bar_index[2])
     array.push(BX, bx)
     array.push(BM, false)
 
-if bearFVG and showFVG
+// Bearish FVG: gap between C1 low and C3 high
+if low[2] > high[0] and showFVG
     t  = low[2]
     b  = high[0]
-    bx = box.new(bar_index[2], t, bar_index + fvgExtBars, b,
-                 bgcolor=color.new(cBear, fvgOpacity),
-                 border_color=color.new(cBear, 40))
+    bx = box.new(bar_index[2], t, bar_index + fvgExtBars, b, bgcolor=color.new(cBear, fvgOpacity), border_color=color.new(cBear, 40))
     array.push(ST, t)
     array.push(SB, b)
     array.push(SI, bar_index[2])
     array.push(SX, bx)
     array.push(SM, false)
 
-// ── Update Bull FVG zones: extend, mitigate, and detect inversions ────────────
+// Update bull FVG zones
 if array.size(BT) > 0
     for i = array.size(BT) - 1 to 0
         isMit = array.get(BM, i)
@@ -223,8 +196,6 @@ if array.size(BT) > 0
         zB    = array.get(BB, i)
         zIdx  = array.get(BI, i)
         bx    = array.get(BX, i)
-
-        // Prune zones that have exceeded max age
         if bar_index - zIdx > fvgMaxAge
             box.delete(bx)
             array.remove(BT, i)
@@ -233,29 +204,20 @@ if array.size(BT) > 0
             array.remove(BX, i)
             array.remove(BM, i)
             continue
-
         if not isMit
             box.set_right(bx, bar_index + fvgExtBars)
-
-            // Inversion check: bull FVG violated → becomes bearish resistance
             violated = invNeedsBody ? close < zB : low < zB
             if violated and showInvFVG
                 array.set(BM, i, true)
                 box.delete(bx)
-                box.new(zIdx, zT, bar_index + fvgExtBars, zB,
-                        bgcolor=color.new(cInvBear, 70),
-                        border_color=color.new(cInvBear, 15), border_width=2)
-                label.new(bar_index, zT, "INV FVG ▼",
-                          color=cInvBear, style=label.style_label_down,
-                          textcolor=color.white, size=size.tiny)
-
-            // Plain mitigation (no inversion overlay)
+                box.new(zIdx, zT, bar_index + fvgExtBars, zB, bgcolor=color.new(cInvBear, 70), border_color=color.new(cInvBear, 15), border_width=2)
+                label.new(bar_index, zT, "INV FVG", color=cInvBear, style=label.style_label_down, textcolor=color.white, size=size.tiny)
             else if close < zB
                 array.set(BM, i, true)
                 if not showFVGMit
                     box.delete(bx)
 
-// ── Update Bear FVG zones ─────────────────────────────────────────────────────
+// Update bear FVG zones
 if array.size(ST) > 0
     for i = array.size(ST) - 1 to 0
         isMit = array.get(SM, i)
@@ -263,7 +225,6 @@ if array.size(ST) > 0
         zB    = array.get(SB, i)
         zIdx  = array.get(SI, i)
         bx    = array.get(SX, i)
-
         if bar_index - zIdx > fvgMaxAge
             box.delete(bx)
             array.remove(ST, i)
@@ -272,184 +233,134 @@ if array.size(ST) > 0
             array.remove(SX, i)
             array.remove(SM, i)
             continue
-
         if not isMit
             box.set_right(bx, bar_index + fvgExtBars)
-
-            // Inversion check: bear FVG violated → becomes bullish support
             violated = invNeedsBody ? close > zT : high > zT
             if violated and showInvFVG
                 array.set(SM, i, true)
                 box.delete(bx)
-                box.new(zIdx, zT, bar_index + fvgExtBars, zB,
-                        bgcolor=color.new(cInvBull, 70),
-                        border_color=color.new(cInvBull, 15), border_width=2)
-                label.new(bar_index, zB, "INV FVG ▲",
-                          color=cInvBull, style=label.style_label_up,
-                          textcolor=color.white, size=size.tiny)
-
+                box.new(zIdx, zT, bar_index + fvgExtBars, zB, bgcolor=color.new(cInvBull, 70), border_color=color.new(cInvBull, 15), border_width=2)
+                label.new(bar_index, zB, "INV FVG", color=cInvBull, style=label.style_label_up, textcolor=color.white, size=size.tiny)
             else if close > zT
                 array.set(SM, i, true)
                 if not showFVGMit
                     box.delete(bx)
 
-// ════════════════════════════════════════════════════════════════════════════
-// ⑤ IMPLIED FVG (IFVG) — 3-candle wick-overlap imbalance
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// IMPLIED FVG (IFVG) — 3-candle wick-overlap imbalance
+// ============================================================================
 //
-// Unlike a standard FVG (where a visible gap exists between candles 1 and 3),
-// an Implied FVG occurs when the outer candles' WICKS fully cover any gap but
-// the middle candle's BODY still represents a significant price imbalance.
-// The zone boundaries are the 50%-wick midpoints (Consequent Encroachment Points).
+// Occurs when outer candle wicks fill any visible gap but the middle candle
+// body still represents a significant imbalance. Zone = 50% midpoints of
+// outer wick (Consequent Encroachment Points).
 //
-// Bullish IFVG conditions  (bars: C1=[2], C2=[1], C3=[0]):
-//   • C1 upper wick reaches into C2 body: high[2] >= open[1]
-//   • C2 is a large bullish body (momentum)
-//   • C3 lower wick reaches into C2 body: low[0]  <= close[1]
-//   • Wicks fill any visible gap:         high[2] >= low[0]   (NOT a standard FVG)
-//   • Body filter: C2 body dominates C1 and C3 bodies
+// Bullish IFVG  (C1=bar[2], C2=bar[1], C3=bar[0]):
+//   C1 upper wick into C2 body: high[2] >= open[1]
+//   C2 is a large bullish body
+//   C3 lower wick into C2 body: low[0] <= close[1]
+//   Wicks cover any gap:        high[2] >= low[0]
+//   Body filter: C2 body dominates outer candles
 
-bIFVG = high[2] >= open[1] and bullC(1) and low[0] <= close[1] and
-        high[2] >= low[0]  and
-        bSz(1) >= math.max(bSz(2), bSz(0)) * ifvgBodyMult
+bIFVG = high[2] >= open[1] and bullC(1) and low[0] <= close[1] and high[2] >= low[0] and bSz(1) >= math.max(bSz(2), bSz(0)) * ifvgBodyMult
 
-// Bearish IFVG conditions:
-//   • C1 lower wick reaches into C2 body: low[2]  <= open[1]
-//   • C2 is a large bearish body
-//   • C3 upper wick reaches into C2 body: high[0] >= close[1]
-//   • Wicks fill any visible gap:         low[2]  <= high[0]
+// Bearish IFVG:
+//   C1 lower wick into C2 body: low[2]  <= open[1]
+//   C2 is a large bearish body
+//   C3 upper wick into C2 body: high[0] >= close[1]
+//   Wicks cover any gap:        low[2]  <= high[0]
 
-sIFVG = low[2] <= open[1] and not bullC(1) and high[0] >= close[1] and
-        low[2]  <= high[0] and
-        bSz(1) >= math.max(bSz(2), bSz(0)) * ifvgBodyMult
+sIFVG = low[2] <= open[1] and not bullC(1) and high[0] >= close[1] and low[2] <= high[0] and bSz(1) >= math.max(bSz(2), bSz(0)) * ifvgBodyMult
 
 if bIFVG and showIFVG
-    // Zone = midpoint of C1 upper wick → midpoint of C3 lower wick
-    zT = (high[2] + close[2]) / 2   // CE of C1 upper wick
-    zB = (low[0]  + open[0])  / 2   // CE of C3 lower wick
+    zT = (high[2] + close[2]) / 2
+    zB = (low[0]  + open[0])  / 2
     if zT > zB
-        box.new(bar_index[2], zT, bar_index + fvgExtBars, zB,
-                bgcolor=color.new(cIFVGBull, 65),
-                border_color=color.new(cIFVGBull, 10), border_width=2)
-        label.new(bar_index[1], zB, "IFVG ▲",
-                  color=cIFVGBull, style=label.style_label_up,
-                  textcolor=#000000, size=size.tiny)
+        box.new(bar_index[2], zT, bar_index + fvgExtBars, zB, bgcolor=color.new(cIFVGBull, 65), border_color=color.new(cIFVGBull, 10), border_width=2)
+        label.new(bar_index[1], zB, "IFVG", color=cIFVGBull, style=label.style_label_up, textcolor=#000000, size=size.tiny)
 
 if sIFVG and showIFVG
-    zT = (high[0] + open[0])  / 2   // CE of C3 upper wick
-    zB = (low[2]  + close[2]) / 2   // CE of C1 lower wick
+    zT = (high[0] + open[0])  / 2
+    zB = (low[2]  + close[2]) / 2
     if zT > zB
-        box.new(bar_index[2], zT, bar_index + fvgExtBars, zB,
-                bgcolor=color.new(cIFVGBear, 65),
-                border_color=color.new(cIFVGBear, 10), border_width=2)
-        label.new(bar_index[1], zT, "IFVG ▼",
-                  color=cIFVGBear, style=label.style_label_down,
-                  textcolor=#000000, size=size.tiny)
+        box.new(bar_index[2], zT, bar_index + fvgExtBars, zB, bgcolor=color.new(cIFVGBear, 65), border_color=color.new(cIFVGBear, 10), border_width=2)
+        label.new(bar_index[1], zT, "IFVG", color=cIFVGBear, style=label.style_label_down, textcolor=#000000, size=size.tiny)
 
-// ════════════════════════════════════════════════════════════════════════════
-// ⑥ ENTRY SIGNALS — Po3 Sweep + FVG/IFVG Confluence
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// ENTRY SIGNALS — Po3 Sweep + FVG/IFVG Confluence
+// ============================================================================
 
-// Is the current bar's close inside any active (un-mitigated) bull FVG zone?
 inBFZ = false
 if array.size(BT) > 0
     for i = array.size(BT) - 1 to 0
-        if not array.get(BM, i) and
-           close >= array.get(BB, i) and close <= array.get(BT, i)
+        if not array.get(BM, i) and close >= array.get(BB, i) and close <= array.get(BT, i)
             inBFZ := true
             break
 
-// Is the current bar's close inside any active bear FVG zone?
 inSFZ = false
 if array.size(ST) > 0
     for i = array.size(ST) - 1 to 0
-        if not array.get(SM, i) and
-           close >= array.get(SB, i) and close <= array.get(ST, i)
+        if not array.get(SM, i) and close >= array.get(SB, i) and close <= array.get(ST, i)
             inSFZ := true
             break
 
-// Long signal:  bullish sweep confirmed  +  price returned above Asian low  +  at a bullish PD array
+// Long: bullish sweep confirmed + price back above Asian low + at bullish FVG/IFVG
 lSig = mBull and not lfired and not na(aLo) and close > aLo and (inBFZ or bIFVG)
 
-// Short signal: bearish sweep confirmed  +  price returned below Asian high  +  at a bearish PD array
+// Short: bearish sweep confirmed + price back below Asian high + at bearish FVG/IFVG
 sSig = mBear and not sfired and not na(aHi) and close < aHi and (inSFZ or sIFVG)
 
-// Fire each signal only once per session
 if lSig
     lfired := true
 if sSig
     sfired := true
 
-// ════════════════════════════════════════════════════════════════════════════
-// ⑦ SL / TP LEVELS — Drawn on signal bar
-// ════════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// SL / TP LEVELS
+// ============================================================================
 
-// Draw a horizontal line + label at price y
 f_lvl(y, c, txt, rb) =>
     line.new(bar_index, y, rb, y, color=c, width=2)
-    label.new(rb, y, txt, color=c,
-              style=label.style_label_left, textcolor=color.white, size=size.tiny)
+    label.new(rb, y, txt, color=c, style=label.style_label_left, textcolor=color.white, size=size.tiny)
 
 if lSig and showSLTP
-    // SL = sweep wick low (or bar low if no sweep) minus ATR buffer
-    sl   = (not na(swpLo) ? swpLo : low)  - atrVal * slBuf
+    sl   = (not na(swpLo) ? swpLo : low) - atrVal * slBuf
     risk = math.abs(close - sl)
     tp1v = close + risk
     tp2v = close + risk * rrTP2
     tp3v = close + risk * rrTP2 * 1.5
     rb   = bar_index + slLnLen
-
-    f_lvl(sl,    #ef5350, "SL  (sweep low − " + str.tostring(slBuf, "#.#") + "× ATR)", rb)
-    f_lvl(close, #b0bec5, "Entry",                                                       rb)
+    f_lvl(sl,    #ef5350, "SL (sweep low - " + str.tostring(slBuf, "#.#") + "x ATR)", rb)
+    f_lvl(close, #b0bec5, "Entry", rb)
     if showTP1
-        f_lvl(tp1v, #80cbc4, "TP1  1:1  (partial close — move to BE)",      rb)
+        f_lvl(tp1v, #80cbc4, "TP1  1:1 R", rb)
     if showTP2
-        f_lvl(tp2v, #26a69a, "TP2  1:" + str.tostring(rrTP2, "#.#") + "  (primary target)", rb)
+        f_lvl(tp2v, #26a69a, "TP2  1:" + str.tostring(rrTP2, "#.#") + " R", rb)
     if showTP3
-        f_lvl(tp3v, #00e676, "TP3  Runner (final target)",                   rb)
-
-    label.new(bar_index, low, "▲  LONG\nPo3 + IFVG",
-              color=cBull, style=label.style_label_up,
-              textcolor=color.white, size=size.normal)
+        f_lvl(tp3v, #00e676, "TP3  Runner", rb)
+    label.new(bar_index, low, "LONG\nPo3+IFVG", color=cBull, style=label.style_label_up, textcolor=color.white, size=size.normal)
 
 if sSig and showSLTP
-    // SL = sweep wick high (or bar high if no sweep) plus ATR buffer
     sl   = (not na(swpHi) ? swpHi : high) + atrVal * slBuf
     risk = math.abs(sl - close)
     tp1v = close - risk
     tp2v = close - risk * rrTP2
     tp3v = close - risk * rrTP2 * 1.5
     rb   = bar_index + slLnLen
-
-    f_lvl(sl,    #ef5350, "SL  (sweep high + " + str.tostring(slBuf, "#.#") + "× ATR)", rb)
-    f_lvl(close, #b0bec5, "Entry",                                                        rb)
+    f_lvl(sl,    #ef5350, "SL (sweep high + " + str.tostring(slBuf, "#.#") + "x ATR)", rb)
+    f_lvl(close, #b0bec5, "Entry", rb)
     if showTP1
-        f_lvl(tp1v, #ef9a9a, "TP1  1:1  (partial close — move to BE)",       rb)
+        f_lvl(tp1v, #ef9a9a, "TP1  1:1 R", rb)
     if showTP2
-        f_lvl(tp2v, #ef5350, "TP2  1:" + str.tostring(rrTP2, "#.#") + "  (primary target)", rb)
+        f_lvl(tp2v, #ef5350, "TP2  1:" + str.tostring(rrTP2, "#.#") + " R", rb)
     if showTP3
-        f_lvl(tp3v, #b71c1c, "TP3  Runner (final target)",                    rb)
+        f_lvl(tp3v, #b71c1c, "TP3  Runner", rb)
+    label.new(bar_index, high, "SHORT\nPo3+IFVG", color=cBear, style=label.style_label_down, textcolor=color.white, size=size.normal)
 
-    label.new(bar_index, high, "▼  SHORT\nPo3 + IFVG",
-              color=cBear, style=label.style_label_down,
-              textcolor=color.white, size=size.normal)
+// ============================================================================
+// ALERTS
+// ============================================================================
 
-// ════════════════════════════════════════════════════════════════════════════
-// ⑧ ALERTS
-// ════════════════════════════════════════════════════════════════════════════
-
-alertcondition(lSig,
-               title   = "Po3+IFVG — Long Signal",
-               message = "[Po3+IFVG] LONG setup confirmed. Bullish sweep + FVG/IFVG confluence. Review chart before entering.")
-
-alertcondition(sSig,
-               title   = "Po3+IFVG — Short Signal",
-               message = "[Po3+IFVG] SHORT setup confirmed. Bearish sweep + FVG/IFVG confluence. Review chart before entering.")
-
-alertcondition(mBull and not mBull[1],
-               title   = "Po3 — Bullish Manipulation Detected",
-               message = "[Po3] SWEEP LOW fired. Bullish day forming. Monitor for distribution entry at FVG/IFVG.")
-
-alertcondition(mBear and not mBear[1],
-               title   = "Po3 — Bearish Manipulation Detected",
-               message = "[Po3] SWEEP HIGH fired. Bearish day forming. Monitor for distribution entry at FVG/IFVG.")
+alertcondition(lSig,               title="Po3+IFVG Long Signal",           message="[Po3+IFVG] LONG setup confirmed. Bullish sweep + FVG/IFVG confluence.")
+alertcondition(sSig,               title="Po3+IFVG Short Signal",          message="[Po3+IFVG] SHORT setup confirmed. Bearish sweep + FVG/IFVG confluence.")
+alertcondition(mBull and not mBull[1], title="Po3 Bullish Manipulation",   message="[Po3] SWEEP LOW detected. Bullish day forming. Watch for FVG/IFVG entry.")
+alertcondition(mBear and not mBear[1], title="Po3 Bearish Manipulation",   message="[Po3] SWEEP HIGH detected. Bearish day forming. Watch for FVG/IFVG entry.")
