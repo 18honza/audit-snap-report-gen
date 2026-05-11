@@ -283,12 +283,12 @@ if sSig
 // ============================================================================
 
 // Entry signals — large arrows
-plotshape(lSig, title="Long Signal",  shape=shape.triangleup,   location=location.belowbar, color=#26a69a, size=size.small, text="LONG")
-plotshape(sSig, title="Short Signal", shape=shape.triangledown, location=location.abovebar, color=#ef5350, size=size.small, text="SHORT")
+plotshape(lSig, title="Long Signal",  style=shape.triangleup,   location=location.belowbar, color=#26a69a, size=size.small, text="LONG")
+plotshape(sSig, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=#ef5350, size=size.small, text="SHORT")
 
 // Manipulation sweep markers — small dots
-plotshape(mBull and not mBull[1], title="Sweep Low",  shape=shape.circle, location=location.belowbar, color=color.new(#26a69a, 40), size=size.tiny)
-plotshape(mBear and not mBear[1], title="Sweep High", shape=shape.circle, location=location.abovebar, color=color.new(#ef5350, 40), size=size.tiny)
+plotshape(mBull and not mBull[1], title="Sweep Low",  style=shape.circle, location=location.belowbar, color=color.new(#26a69a, 40), size=size.tiny)
+plotshape(mBear and not mBear[1], title="Sweep High", style=shape.circle, location=location.abovebar, color=color.new(#ef5350, 40), size=size.tiny)
 
 // ============================================================================
 // ALERTS
